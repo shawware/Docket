@@ -163,6 +163,13 @@ final class MySqlStorage implements StorageInterface
             ->fetchAll(\PDO::FETCH_COLUMN);
     }
 
+    public function assigneesWithOpenTasks(): array
+    {
+        return $this->pdo
+            ->query("SELECT DISTINCT assignee_user_id FROM tasks WHERE status = 'open' AND assignee_user_id IS NOT NULL")
+            ->fetchAll(\PDO::FETCH_COLUMN);
+    }
+
     public function unassignedTasksForChannel(string $channelId): array
     {
         $statement = $this->pdo->prepare(

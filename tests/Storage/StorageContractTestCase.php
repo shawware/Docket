@@ -266,6 +266,34 @@ abstract class StorageContractTestCase extends TestCase
         $this->assertNotContains('C2', $channels);
     }
 
+    public function testAssigneesWithOpenTasksListsOnlyUsersWithAnOpenTask(): void
+    {
+        $storage = $this->createStorage();
+
+        $storage->createTask('C1', 'Open, assigned', 'U_OPEN', 1000, false, null, 'U1');
+        $storage->createTask('C1', 'Open, unassigned', null, 2000, false, null, 'U1');
+        $done = $storage->createTask('C2', 'Will be done', 'U_DONE', 1000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $assignees = $storage->assigneesWithOpenTasks();
+
+        $this->assertContains('U_OPEN', $assignees);
+        $this->assertNotContains('U_DONE', $assignees);
+        $this->assertNotContains(null, $assignees, 'unassigned tasks must not surface a null entry');
+    }
+
+    public function testAssigneesWithOpenTasksListsEachUserOnceEvenAcrossChannels(): void
+    {
+        $storage = $this->createStorage();
+
+        $storage->createTask('C1', 'In C1', 'U_ME', 1000, false, null, 'U1');
+        $storage->createTask('C2', 'In C2', 'U_ME', 1000, false, null, 'U1');
+
+        $assignees = $storage->assigneesWithOpenTasks();
+
+        $this->assertSame(1, count(array_filter($assignees, static fn (string $id): bool => $id === 'U_ME')));
+    }
+
     public function testUnassignedTasksForChannelExcludesAssignedRows(): void
     {
         $storage = $this->createStorage();

@@ -158,6 +158,15 @@ interface StorageInterface
     public function channelsWithOpenTasks(): array;
 
     /**
+     * User ids with at least one open task, across every channel — for
+     * the weekly digest, which DMs each of them a per-channel summary
+     * via tasksForAssignee().
+     *
+     * @return array<int, string>
+     */
+    public function assigneesWithOpenTasks(): array;
+
+    /**
      * A channel's open tasks with no assignee, ordered by `priority`
      * ascending — for the weekly digest's channel-level summary.
      *
