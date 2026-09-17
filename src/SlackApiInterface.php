@@ -53,4 +53,10 @@ interface SlackApiInterface
      * @param array<string, mixed> $view
      */
     public function openView(string $triggerId, array $view): void;
+
+    /**
+     * Opens (or reuses) a DM with a user and returns its channel id, for
+     * the assignment notification and weekly digest.
+     */
+    public function openDm(string $userId): string;
 }

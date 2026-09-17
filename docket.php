@@ -23,6 +23,7 @@ final class Router
         private readonly StorageInterface $storage,
         private readonly SlackApiInterface $slackApi,
         private readonly ChannelListService $channelListService,
+        private readonly AssignmentNotifier $assignmentNotifier,
         private readonly int $priorityGap
     ) {
     }
@@ -187,8 +188,10 @@ final class Router
 
         $sourcePermalink = $link === '' ? null : $link;
 
+        $actorUserId = (string) ($payload['user']['id'] ?? '');
+        $previousAssigneeUserId = null;
+
         if ($taskId === null) {
-            $userId = (string) ($payload['user']['id'] ?? '');
             $this->storage->createTask(
                 $channelId,
                 $title,
@@ -196,10 +199,11 @@ final class Router
                 $this->nextPriority($channelId),
                 $important,
                 $dueDate,
-                $userId,
+                $actorUserId,
                 $sourcePermalink
             );
         } else {
+            $previousAssigneeUserId = $this->storage->getTask((int) $taskId)['assigneeUserId'] ?? null;
             $this->storage->updateTaskDetails(
                 (int) $taskId,
                 $title,
@@ -211,8 +215,29 @@ final class Router
         }
 
         $this->channelListService->publish($channelId);
+        $this->maybeNotifyAssignee($assigneeUserId, $previousAssigneeUserId, $title, $channelId, $actorUserId);
 
         return null;
+    }
+
+    /**
+     * DMs the new assignee, unless there's nothing to tell them: no
+     * assignee, the assignee didn't actually change, or they assigned it
+     * to themselves (they already know).
+     */
+    private function maybeNotifyAssignee(
+        ?string $assigneeUserId,
+        ?string $previousAssigneeUserId,
+        string $taskTitle,
+        string $channelId,
+        string $actorUserId
+    ): void {
+        if ($assigneeUserId === null || $assigneeUserId === $previousAssigneeUserId || $assigneeUserId === $actorUserId) {
+            return;
+        }
+
+        $listState = $this->storage->getListState($channelId);
+        $this->assignmentNotifier->notify($assigneeUserId, $taskTitle, $channelId, $listState['messageTs'] ?? null);
     }
 
     /**

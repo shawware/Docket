@@ -161,6 +161,24 @@ final class SlackApiTest extends TestCase
         );
     }
 
+    public function testOpenDmCallsConversationsOpenAndReturnsTheDmChannelId(): void
+    {
+        $history = [];
+        $slackApi = $this->makeSlackApiWithMockedHttp(
+            new Response(200, [], json_encode(['ok' => true, 'channel' => ['id' => 'D123']])),
+            $history
+        );
+
+        $dmChannel = $slackApi->openDm('U123');
+
+        $this->assertSame('D123', $dmChannel);
+        $this->assertCount(1, $history);
+        $request = $history[0]['request'];
+
+        $this->assertSame('https://slack.com/api/conversations.open', (string) $request->getUri());
+        $this->assertSame(['users' => 'U123'], json_decode((string) $request->getBody(), true));
+    }
+
     public function testPostMessageThrowsWhenSlackReturnsOkFalse(): void
     {
         $history = [];

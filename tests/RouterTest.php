@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Shawware\Docket\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Shawware\Docket\AssignmentNotifier;
 use Shawware\Docket\ChannelListService;
 use Shawware\Docket\ListRenderer;
 use Shawware\Docket\Router;
@@ -245,6 +246,111 @@ final class RouterTest extends TestCase
         $this->assertSame(5000, $updated['priority']);
     }
 
+    public function testViewSubmissionCreateWithAnAssigneeNotifiesThem(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'New task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+        ]));
+
+        $this->assertSame(['U9'], $slackApi->openedDms);
+    }
+
+    public function testViewSubmissionCreateFirstTaskWithAssigneeStillIncludesTheListLinkInTheDm(): void
+    {
+        // Guards the ordering in handleViewSubmission: publish() must run
+        // before maybeNotifyAssignee(), or the very first task in a
+        // channel would DM its assignee before list_state exists to link to.
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'New task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+        ]));
+
+        $dmMessage = end($slackApi->postedMessages);
+        $this->assertStringContainsString('View the list', $dmMessage['blocks'][0]['text']['text']);
+    }
+
+    public function testViewSubmissionCreateAssignedToYourselfDoesNotNotify(): void
+    {
+        // viewSubmissionPayload() always acts as U1.
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'New task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U1']],
+        ]));
+
+        $this->assertSame([], $slackApi->openedDms);
+    }
+
+    public function testViewSubmissionCreateWithNoAssigneeDoesNotNotify(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'New task']],
+        ]));
+
+        $this->assertSame([], $slackApi->openedDms);
+    }
+
+    public function testViewSubmissionEditChangingTheAssigneeNotifiesTheNewOne(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', 'U8', 1000, false, null, 'U1');
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', $task['id'], [
+            'title_block' => ['title_input' => ['value' => 'Task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+        ]));
+
+        $this->assertSame(['U9'], $slackApi->openedDms);
+    }
+
+    public function testViewSubmissionEditAssigningAPreviouslyUnassignedTaskNotifies(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', null, 1000, false, null, 'U1');
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', $task['id'], [
+            'title_block' => ['title_input' => ['value' => 'Task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+        ]));
+
+        $this->assertSame(['U9'], $slackApi->openedDms);
+    }
+
+    public function testViewSubmissionEditLeavingTheAssigneeUnchangedDoesNotNotify(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', 'U9', 1000, false, null, 'U1');
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', $task['id'], [
+            'title_block' => ['title_input' => ['value' => 'Task, retitled']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+        ]));
+
+        $this->assertSame([], $slackApi->openedDms);
+    }
+
+    public function testViewSubmissionEditReassigningToYourselfDoesNotNotify(): void
+    {
+        // viewSubmissionPayload() always acts as U1.
+        [$router, $storage, $slackApi] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', 'U9', 1000, false, null, 'U1');
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', $task['id'], [
+            'title_block' => ['title_input' => ['value' => 'Task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U1']],
+        ]));
+
+        $this->assertSame([], $slackApi->openedDms);
+    }
+
     public function testViewSubmissionWithOptionalBlocksOmittedLeavesThemUnset(): void
     {
         // Slack omits an untouched optional block's key entirely, rather
@@ -434,7 +540,8 @@ final class RouterTest extends TestCase
         $storage = new InMemoryStorage();
         $slackApi = new RecordingSlackApi();
         $channelListService = new ChannelListService($storage, $slackApi, new ListRenderer(), 3, 90);
-        $router = new Router($storage, $slackApi, $channelListService, self::PRIORITY_GAP);
+        $assignmentNotifier = new AssignmentNotifier($slackApi);
+        $router = new Router($storage, $slackApi, $channelListService, $assignmentNotifier, self::PRIORITY_GAP);
 
         return [$router, $storage, $slackApi];
     }

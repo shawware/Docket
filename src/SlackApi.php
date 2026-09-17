@@ -89,6 +89,13 @@ final class SlackApi implements SlackApiInterface
         ]);
     }
 
+    public function openDm(string $userId): string
+    {
+        $body = $this->call('conversations.open', ['users' => $userId]);
+
+        return (string) $body['channel']['id'];
+    }
+
     /**
      * @param array<string, mixed> $json
      * @return array<string, mixed>

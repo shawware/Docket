@@ -8,6 +8,7 @@ require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../docket.php';
 require __DIR__ . '/../env.php';
 
+use Shawware\Docket\AssignmentNotifier;
 use Shawware\Docket\ChannelListService;
 use Shawware\Docket\ListRenderer;
 use Shawware\Docket\Router;
@@ -75,7 +76,8 @@ $channelListService = new ChannelListService(
     $config['dueSoonWindowDays'],
     $config['sourceLinkMaxAgeDays']
 );
-$router = new Router($storage, $slackApi, $channelListService, $config['priorityGap']);
+$assignmentNotifier = new AssignmentNotifier($slackApi);
+$router = new Router($storage, $slackApi, $channelListService, $assignmentNotifier, $config['priorityGap']);
 
 if ($path === '/slack/interactions') {
     parse_str($rawBody, $formFields);
