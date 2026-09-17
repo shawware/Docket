@@ -95,6 +95,7 @@ final class TaskModal
                     'element' => array_filter([
                         'type' => 'plain_text_input',
                         'action_id' => 'link_input',
+                        'placeholder' => ['type' => 'plain_text', 'text' => 'Paste a Slack link to a message (optional)'],
                         'initial_value' => $prefill['sourcePermalink'] ?? null,
                     ], static fn (mixed $value): bool => $value !== null),
                 ],

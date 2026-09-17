@@ -25,6 +25,10 @@ final class TaskModalTest extends TestCase
         $this->assertArrayNotHasKey('initial_date', $dueDateBlock['element']);
         $this->assertArrayNotHasKey('initial_options', $importantBlock['element']);
         $this->assertArrayNotHasKey('initial_value', $linkBlock['element']);
+        $this->assertSame(
+            'Paste a Slack link to a message (optional)',
+            $linkBlock['element']['placeholder']['text']
+        );
     }
 
     public function testEditModalCarriesTheTasksCurrentValuesAndIsTitledEditTask(): void
