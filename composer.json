@@ -1,0 +1,26 @@
+{
+    "name": "shawware/docket",
+    "description": "Docket — a Slack team backlog app",
+    "type": "project",
+    "license": "GPL-3.0-only",
+    "require": {
+        "php": "^8.5",
+        "ext-pdo": "*",
+        "vlucas/phpdotenv": "^5.6",
+        "guzzlehttp/guzzle": "^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Shawware\\Docket\\": "src/",
+            "Shawware\\Docket\\Storage\\": "storage/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Shawware\\Docket\\Tests\\": "tests/"
+        }
+    }
+}
