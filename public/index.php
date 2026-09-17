@@ -82,14 +82,6 @@ if ($path === '/slack/interactions') {
     $payload = json_decode((string) ($formFields['payload'] ?? '{}'), true);
     $payload = is_array($payload) ? $payload : [];
 
-    // Temporary: pin down exactly what Slack sends for the message
-    // shortcut before removing this once it's confirmed working.
-    error_log(sprintf(
-        '[Docket] interactions payload type=%s callback_id=%s',
-        $payload['type'] ?? 'n/a',
-        $payload['callback_id'] ?? ($payload['view']['callback_id'] ?? 'n/a')
-    ));
-
     if (($payload['type'] ?? null) === 'view_submission') {
         $result = $router->handleViewSubmission($payload);
         header('Content-Type: application/json');
