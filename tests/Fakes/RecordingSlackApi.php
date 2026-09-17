@@ -23,6 +23,8 @@ final class RecordingSlackApi implements SlackApiInterface
 
     public bool $joinChannelFails = false;
 
+    public bool $openViewFails = false;
+
     /** @var array<int, array{triggerId: string, view: array<string, mixed>}> */
     public array $openedViews = [];
 
@@ -76,6 +78,10 @@ final class RecordingSlackApi implements SlackApiInterface
     {
         $this->calls[] = 'openView';
         $this->openedViews[] = ['triggerId' => $triggerId, 'view' => $view];
+
+        if ($this->openViewFails) {
+            throw new \RuntimeException('expired_trigger_id');
+        }
     }
 
     public function openDm(string $userId): string

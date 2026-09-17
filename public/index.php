@@ -123,19 +123,39 @@ if ($path === '/slack/interactions') {
     }
 
     if (($payload['type'] ?? null) === 'view_submission') {
-        $result = $router->handleViewSubmission($payload);
+        try {
+            $result = $router->handleViewSubmission($payload);
+        } catch (\Throwable $e) {
+            // A non-200 here is deliberate: Slack shows the user its own
+            // "trouble connecting" error and leaves the modal open. That's
+            // an honest failure signal — returning 200 would tell Slack to
+            // close the modal as if the submission succeeded, when it
+            // didn't, leaving the user with no idea anything went wrong.
+            error_log('[Docket] handleViewSubmission threw: ' . $e->getMessage());
+            http_response_code(500);
+            return;
+        }
+
         header('Content-Type: application/json');
         echo json_encode($result ?? new stdClass());
         return;
     }
 
     if (($payload['type'] ?? null) === 'message_action') {
-        $router->handleMessageShortcut($payload);
+        try {
+            $router->handleMessageShortcut($payload);
+        } catch (\Throwable $e) {
+            error_log('[Docket] handleMessageShortcut threw: ' . $e->getMessage());
+        }
         http_response_code(200);
         return;
     }
 
-    $router->handleBlockAction($payload);
+    try {
+        $router->handleBlockAction($payload);
+    } catch (\Throwable $e) {
+        error_log('[Docket] handleBlockAction threw: ' . $e->getMessage());
+    }
     http_response_code(200);
     return;
 }

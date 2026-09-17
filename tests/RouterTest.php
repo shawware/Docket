@@ -205,6 +205,23 @@ final class RouterTest extends TestCase
         $this->assertNull(json_decode($slackApi->openedViews[0]['view']['private_metadata'], true)['taskId']);
     }
 
+    public function testHandleBlockActionPropagatesExceptionsFromSlackApi(): void
+    {
+        // public/index.php relies on Router NOT swallowing this itself —
+        // its own try/catch is what turns this into a clean 200 for Slack.
+        [$router, , $slackApi] = $this->makeRouter();
+        $slackApi->openViewFails = true;
+
+        $this->expectException(\RuntimeException::class);
+
+        $router->handleBlockAction([
+            'type' => 'block_actions',
+            'trigger_id' => 'trigger-1',
+            'channel' => ['id' => 'C1'],
+            'actions' => [['action_id' => 'add_task']],
+        ]);
+    }
+
     public function testHandleBlockActionOpensAPreFilledModalForEditTask(): void
     {
         [$router, $storage, $slackApi] = $this->makeRouter();
@@ -516,6 +533,25 @@ final class RouterTest extends TestCase
             'https://my-workspace.slack.com/archives/C1/p1699999999000100',
             $linkBlock['element']['initial_value']
         );
+    }
+
+    public function testHandleMessageShortcutPropagatesExceptionsFromSlackApi(): void
+    {
+        // Same contract as handleBlockAction: public/index.php's own
+        // try/catch is what protects this, not Router swallowing it.
+        [$router, , $slackApi] = $this->makeRouter();
+        $slackApi->openViewFails = true;
+
+        $this->expectException(\RuntimeException::class);
+
+        $router->handleMessageShortcut([
+            'type' => 'message_action',
+            'callback_id' => 'add_as_task',
+            'trigger_id' => 'trigger-3',
+            'channel' => ['id' => 'C1'],
+            'team' => ['domain' => 'my-workspace'],
+            'message' => ['text' => 'Something is broken', 'user' => 'U9', 'ts' => '1699999999.000100'],
+        ]);
     }
 
     public function testHandleMessageShortcutIgnoresUnrelatedCallbackIds(): void
