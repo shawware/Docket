@@ -17,7 +17,7 @@ use Shawware\Docket\Storage\StorageInterface;
 final class Router
 {
     /** @var array<int, string> task_menu actions that mutate storage directly, with no modal. */
-    private const HANDLED_TASK_MENU_ACTIONS = ['mark_done', 'move_up', 'move_down', 'reopen'];
+    private const HANDLED_TASK_MENU_ACTIONS = ['mark_done', 'toggle_important', 'move_up', 'move_down', 'reopen'];
 
     public function __construct(
         private readonly StorageInterface $storage,
@@ -105,12 +105,36 @@ final class Router
 
         match ($taskAction) {
             'mark_done' => $this->storage->markDone($taskId),
+            'toggle_important' => $this->toggleImportant($taskId),
             'move_up' => $this->storage->swapPriority($taskId, 'up'),
             'move_down' => $this->storage->swapPriority($taskId, 'down'),
             'reopen' => $this->storage->reopenTask($taskId),
         };
 
         $this->channelListService->publish($channelId);
+    }
+
+    /**
+     * Flips a task's Important flag — the only field `updateTaskDetails()`
+     * doesn't let you change alone, so this reads the task's other fields
+     * back out unchanged and writes them straight through.
+     */
+    private function toggleImportant(int $taskId): void
+    {
+        $task = $this->storage->getTask($taskId);
+
+        if ($task === null) {
+            return;
+        }
+
+        $this->storage->updateTaskDetails(
+            $taskId,
+            $task['title'],
+            $task['assigneeUserId'],
+            $task['dueDate'],
+            !$task['important'],
+            $task['sourcePermalink']
+        );
     }
 
     /**

@@ -125,6 +125,45 @@ final class RouterTest extends TestCase
         $this->assertNull($reopened['completedAt']);
     }
 
+    public function testHandleBlockActionTogglesImportantOn(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', 'U9', 1000, false, new \DateTimeImmutable('2026-07-01'), 'U1', 'https://example.com');
+
+        $router->handleBlockAction($this->blockActionPayload('C1', $task['id'] . ':toggle_important'));
+
+        $updated = $storage->getTask($task['id']);
+        $this->assertTrue($updated['important']);
+        // Every other field must survive the round-trip untouched.
+        $this->assertSame('Task', $updated['title']);
+        $this->assertSame('U9', $updated['assigneeUserId']);
+        $this->assertSame('2026-07-01', $updated['dueDate']->format('Y-m-d'));
+        $this->assertSame('https://example.com', $updated['sourcePermalink']);
+        $this->assertSame(1000, $updated['priority']);
+    }
+
+    public function testHandleBlockActionTogglesImportantOff(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', null, 1000, true, null, 'U1');
+
+        $router->handleBlockAction($this->blockActionPayload('C1', $task['id'] . ':toggle_important'));
+
+        $this->assertFalse($storage->getTask($task['id'])['important']);
+    }
+
+    public function testHandleBlockActionToggleImportantIsANoOpForAnUnknownTaskId(): void
+    {
+        // Matches mark_done/move_up/reopen: the write is a safe no-op, but
+        // the list still republishes afterward regardless (unlike
+        // edit_task/remind_me-style actions, which return before that).
+        [$router, $storage] = $this->makeRouter();
+
+        $router->handleBlockAction($this->blockActionPayload('C1', '999999:toggle_important'));
+
+        $this->assertNull($storage->getTask(999999));
+    }
+
     public function testHandleBlockActionSwapsPriorityDownwardsToo(): void
     {
         [$router, $storage] = $this->makeRouter();

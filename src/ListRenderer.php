@@ -21,6 +21,7 @@ final class ListRenderer
     private const ACTION_LABELS = [
         'mark_done' => '✅ Done',
         'edit_task' => '✏️ Edit',
+        'toggle_important' => '⭐ Toggle Important',
         'move_up' => '▲ Move up',
         'move_down' => '▼ Move down',
         'reopen' => '↩️ Reopen',
@@ -227,7 +228,7 @@ final class ListRenderer
         bool $isFirst,
         bool $isLast
     ): array {
-        $actions = ['mark_done', 'edit_task'];
+        $actions = ['mark_done', 'edit_task', 'toggle_important'];
         if (!$isFirst) {
             $actions[] = 'move_up';
         }
