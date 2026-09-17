@@ -116,7 +116,12 @@ final class InMemoryStorage implements StorageInterface
 
     public function swapPriority(int $taskId, string $direction): void
     {
-        $task = $this->tasks[$taskId];
+        $task = $this->tasks[$taskId] ?? null;
+
+        if ($task === null) {
+            return;
+        }
+
         $siblings = $this->tasksForChannel($task['channelId'], includeDone: false);
 
         $index = array_search($taskId, array_map(static fn (array $t): int => $t['id'], $siblings), true);

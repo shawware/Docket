@@ -178,6 +178,15 @@ abstract class StorageContractTestCase extends TestCase
         $this->assertSame(['First', 'Second'], $ordered);
     }
 
+    public function testSwapPriorityIsANoOpForAnUnknownTaskId(): void
+    {
+        $storage = $this->createStorage();
+
+        $storage->swapPriority(999999, 'up');
+
+        $this->assertNull($storage->getTask(999999));
+    }
+
     public function testMarkDoneSetsStatusAndCompletedAtButKeepsTheRow(): void
     {
         $storage = $this->createStorage();
