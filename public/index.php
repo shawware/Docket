@@ -11,6 +11,7 @@ require __DIR__ . '/../env.php';
 use Shawware\Docket\AssignmentNotifier;
 use Shawware\Docket\ChannelListService;
 use Shawware\Docket\ListRenderer;
+use Shawware\Docket\RequestDispatcher;
 use Shawware\Docket\Router;
 use Shawware\Docket\SlackApi;
 use Shawware\Docket\Storage\MySqlStorage;
@@ -80,6 +81,7 @@ $router = new Router(
     $listRenderer,
     $config['priorityGap']
 );
+$dispatcher = new RequestDispatcher($router);
 
 if ($path === '/slack/events') {
     $eventPayload = json_decode($rawBody, true) ?: [];
@@ -93,23 +95,8 @@ if ($path === '/slack/events') {
         ));
     }
 
-    try {
-        $challenge = $router->handleEvent($eventPayload);
-    } catch (\Throwable $e) {
-        error_log('[Docket] handleEvent threw: ' . $e->getMessage());
-        http_response_code(200);
-        return;
-    }
-
-    if ($challenge !== null) {
-        header('Content-Type: text/plain');
-        echo $challenge;
-    }
-
-    return;
-}
-
-if ($path === '/slack/interactions') {
+    $result = $dispatcher->dispatchEvent($eventPayload);
+} elseif ($path === '/slack/interactions') {
     parse_str($rawBody, $formFields);
     $payload = json_decode((string) ($formFields['payload'] ?? '{}'), true);
     $payload = is_array($payload) ? $payload : [];
@@ -122,48 +109,20 @@ if ($path === '/slack/interactions') {
         ));
     }
 
-    if (($payload['type'] ?? null) === 'view_submission') {
-        try {
-            $result = $router->handleViewSubmission($payload);
-        } catch (\Throwable $e) {
-            // A non-200 here is deliberate: Slack shows the user its own
-            // "trouble connecting" error and leaves the modal open. That's
-            // an honest failure signal — returning 200 would tell Slack to
-            // close the modal as if the submission succeeded, when it
-            // didn't, leaving the user with no idea anything went wrong.
-            error_log('[Docket] handleViewSubmission threw: ' . $e->getMessage());
-            http_response_code(500);
-            return;
-        }
-
-        header('Content-Type: application/json');
-        echo json_encode($result ?? new stdClass());
-        return;
+    $result = $dispatcher->dispatchInteraction($payload);
+} else {
+    if ($debugLogging) {
+        error_log("[Docket] commands payload body={$rawBody}");
     }
 
-    if (($payload['type'] ?? null) === 'message_action') {
-        try {
-            $router->handleMessageShortcut($payload);
-        } catch (\Throwable $e) {
-            error_log('[Docket] handleMessageShortcut threw: ' . $e->getMessage());
-        }
-        http_response_code(200);
-        return;
-    }
-
-    try {
-        $router->handleBlockAction($payload);
-    } catch (\Throwable $e) {
-        error_log('[Docket] handleBlockAction threw: ' . $e->getMessage());
-    }
-    http_response_code(200);
-    return;
+    parse_str($rawBody, $payload);
+    $result = $dispatcher->dispatchCommand($payload);
 }
 
-if ($debugLogging) {
-    error_log("[Docket] commands payload body={$rawBody}");
+http_response_code($result->status);
+
+if ($result->contentType !== null) {
+    header("Content-Type: {$result->contentType}");
 }
 
-parse_str($rawBody, $payload);
-header('Content-Type: application/json');
-echo json_encode($router->handleSlashCommand($payload));
+echo $result->body;

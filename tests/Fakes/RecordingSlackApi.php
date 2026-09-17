@@ -25,6 +25,10 @@ final class RecordingSlackApi implements SlackApiInterface
 
     public bool $openViewFails = false;
 
+    public bool $postMessageFails = false;
+
+    public bool $publishViewFails = false;
+
     /** @var array<int, array{triggerId: string, view: array<string, mixed>}> */
     public array $openedViews = [];
 
@@ -48,6 +52,10 @@ final class RecordingSlackApi implements SlackApiInterface
     {
         $this->calls[] = 'postMessage';
         $this->postedMessages[] = ['channel' => $channel, 'blocks' => $blocks, 'fallbackText' => $fallbackText];
+
+        if ($this->postMessageFails) {
+            throw new \RuntimeException('channel_not_found');
+        }
 
         return $this->nextMessageTs;
     }
@@ -93,5 +101,9 @@ final class RecordingSlackApi implements SlackApiInterface
     {
         $this->calls[] = 'publishView';
         $this->publishedViews[] = ['userId' => $userId, 'view' => $view];
+
+        if ($this->publishViewFails) {
+            throw new \RuntimeException('missing_scope');
+        }
     }
 }
