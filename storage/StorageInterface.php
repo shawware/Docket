@@ -112,15 +112,17 @@ interface StorageInterface
 
     /**
      * Updates a task's editable fields in one place — title, assignee,
-     * due date, and the Important flag. Never touches `priority`; a
-     * task's position in the list only ever changes via swapPriority().
+     * due date, the Important flag, and the source link. Never touches
+     * `priority`; a task's position in the list only ever changes via
+     * swapPriority().
      */
     public function updateTaskDetails(
         int $taskId,
         string $title,
         ?string $assigneeUserId,
         ?\DateTimeImmutable $dueDate,
-        bool $important
+        bool $important,
+        ?string $sourcePermalink
     ): void;
 
     /**

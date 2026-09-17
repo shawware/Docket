@@ -106,7 +106,8 @@ final class InMemoryStorage implements StorageInterface
         string $title,
         ?string $assigneeUserId,
         ?\DateTimeImmutable $dueDate,
-        bool $important
+        bool $important,
+        ?string $sourcePermalink
     ): void {
         if (!isset($this->tasks[$taskId])) {
             return;
@@ -115,6 +116,7 @@ final class InMemoryStorage implements StorageInterface
         $this->tasks[$taskId]['title'] = $title;
         $this->tasks[$taskId]['assigneeUserId'] = $assigneeUserId;
         $this->tasks[$taskId]['dueDate'] = $dueDate;
+        $this->tasks[$taskId]['sourcePermalink'] = $sourcePermalink;
         $this->tasks[$taskId]['important'] = $important;
     }
 

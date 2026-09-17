@@ -128,7 +128,14 @@ abstract class StorageContractTestCase extends TestCase
         $created = $storage->createTask('C1', 'Original title', null, 1000, false, null, 'U1');
         $newDueDate = new \DateTimeImmutable('2026-12-25');
 
-        $storage->updateTaskDetails($created['id'], 'New title', 'U_NEW_ASSIGNEE', $newDueDate, true);
+        $storage->updateTaskDetails(
+            $created['id'],
+            'New title',
+            'U_NEW_ASSIGNEE',
+            $newDueDate,
+            true,
+            'https://slack.example/archives/C1/p123'
+        );
 
         $updated = $storage->getTask($created['id']);
 
@@ -136,14 +143,34 @@ abstract class StorageContractTestCase extends TestCase
         $this->assertSame('U_NEW_ASSIGNEE', $updated['assigneeUserId']);
         $this->assertEquals($newDueDate, $updated['dueDate']);
         $this->assertTrue($updated['important']);
+        $this->assertSame('https://slack.example/archives/C1/p123', $updated['sourcePermalink']);
         $this->assertSame(1000, $updated['priority'], 'editing must never change priority');
+    }
+
+    public function testUpdateTaskDetailsCanClearAnExistingSourcePermalink(): void
+    {
+        $storage = $this->createStorage();
+        $created = $storage->createTask(
+            'C1',
+            'Task',
+            null,
+            1000,
+            false,
+            null,
+            'U1',
+            'https://slack.example/archives/C1/p123'
+        );
+
+        $storage->updateTaskDetails($created['id'], 'Task', null, null, false, null);
+
+        $this->assertNull($storage->getTask($created['id'])['sourcePermalink']);
     }
 
     public function testUpdateTaskDetailsIsANoOpForAnUnknownTaskId(): void
     {
         $storage = $this->createStorage();
 
-        $storage->updateTaskDetails(999999, 'New title', null, null, false);
+        $storage->updateTaskDetails(999999, 'New title', null, null, false, null);
 
         $this->assertNull($storage->getTask(999999));
     }

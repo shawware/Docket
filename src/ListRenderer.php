@@ -45,7 +45,7 @@ final class ListRenderer
      *    done tasks — as returned by StorageInterface::tasksForChannel().
      * @return array<int, array<string, mixed>> Block Kit blocks.
      */
-    public function render(array $tasks, \DateTimeImmutable $now, int $dueSoonWindowDays): array
+    public function render(array $tasks, \DateTimeImmutable $now, int $dueSoonWindowDays, int $sourceLinkMaxAgeDays): array
     {
         $today = new \DateTimeImmutable($now->format('Y-m-d'));
         $openTasks = array_values(array_filter($tasks, static fn (array $task): bool => $task['status'] === 'open'));
@@ -66,7 +66,15 @@ final class ListRenderer
 
         $lastOpenIndex = count($openTasks) - 1;
         foreach ($openTasks as $index => $task) {
-            $blocks[] = $this->buildTaskRow($task, $index + 1, $today, $index === 0, $index === $lastOpenIndex);
+            $blocks[] = $this->buildTaskRow(
+                $task,
+                $index + 1,
+                $today,
+                $now,
+                $sourceLinkMaxAgeDays,
+                $index === 0,
+                $index === $lastOpenIndex
+            );
         }
 
         foreach ($doneTasks as $task) {
@@ -211,8 +219,15 @@ final class ListRenderer
      * @param array<string, mixed> $task
      * @return array<string, mixed>
      */
-    private function buildTaskRow(array $task, int $rank, \DateTimeImmutable $today, bool $isFirst, bool $isLast): array
-    {
+    private function buildTaskRow(
+        array $task,
+        int $rank,
+        \DateTimeImmutable $today,
+        \DateTimeImmutable $now,
+        int $sourceLinkMaxAgeDays,
+        bool $isFirst,
+        bool $isLast
+    ): array {
         $actions = ['mark_done', 'edit_task'];
         if (!$isFirst) {
             $actions[] = 'move_up';
@@ -230,15 +245,44 @@ final class ListRenderer
             $actions
         );
 
+        $text = $rank . '. ' . $this->rowLabel($task, $today) . $this->sourceLink($task, $now, $sourceLinkMaxAgeDays);
+
         return [
             'type' => 'section',
-            'text' => ['type' => 'mrkdwn', 'text' => $rank . '. ' . $this->rowLabel($task, $today)],
+            'text' => ['type' => 'mrkdwn', 'text' => $text],
             'accessory' => [
                 'type' => 'overflow',
                 'action_id' => 'task_menu',
                 'options' => $options,
             ],
         ];
+    }
+
+    /**
+     * A trailing 🔗 link to the task's source message, only while that
+     * message is likely to still exist — see CLAUDE.md's Decisions
+     * section. A heuristic based on the message's own timestamp (parsed
+     * straight out of the permalink, so this is accurate whether the
+     * link came from the message shortcut or was pasted in by hand); a
+     * link that isn't a recognizable Slack permalink falls back to the
+     * task's `createdAt`. Not a live Slack check either way.
+     *
+     * @param array<string, mixed> $task
+     */
+    private function sourceLink(array $task, \DateTimeImmutable $now, int $maxAgeDays): string
+    {
+        if ($task['sourcePermalink'] === null) {
+            return '';
+        }
+
+        $linkCreatedAt = SlackPermalink::messageTimestamp($task['sourcePermalink']) ?? $task['createdAt'];
+        $expiresAt = $linkCreatedAt->modify("+{$maxAgeDays} days");
+
+        if ($now > $expiresAt) {
+            return '';
+        }
+
+        return ' <' . $task['sourcePermalink'] . '|🔗>';
     }
 
     /**

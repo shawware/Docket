@@ -91,7 +91,7 @@ final class Router
             $task = $this->storage->getTask($taskId);
 
             if ($task !== null) {
-                $this->slackApi->openView($triggerId, TaskModal::build($channelId, $task));
+                $this->slackApi->openView($triggerId, TaskModal::build($channelId, $task['id'], $task));
             }
 
             return;
@@ -109,6 +109,41 @@ final class Router
         };
 
         $this->channelListService->publish($channelId);
+    }
+
+    /**
+     * Handles the "Add as task" message shortcut (`callback_id`
+     * `add_as_task`): opens the add-task modal pre-filled with the
+     * message's text, author (as suggested assignee), and a permalink
+     * constructed from `team.domain` + `channel.id` + `message.ts` — the
+     * payload doesn't include a permalink field directly.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function handleMessageShortcut(array $payload): void
+    {
+        if (($payload['callback_id'] ?? null) !== 'add_as_task') {
+            return;
+        }
+
+        $channelId = (string) ($payload['channel']['id'] ?? '');
+        $triggerId = (string) ($payload['trigger_id'] ?? '');
+        $teamDomain = (string) ($payload['team']['domain'] ?? '');
+        $message = $payload['message'] ?? [];
+        $messageTs = (string) ($message['ts'] ?? '');
+
+        $permalink = sprintf(
+            'https://%s.slack.com/archives/%s/p%s',
+            $teamDomain,
+            $channelId,
+            str_replace('.', '', $messageTs)
+        );
+
+        $this->slackApi->openView($triggerId, TaskModal::build($channelId, null, [
+            'title' => (string) ($message['text'] ?? ''),
+            'assigneeUserId' => $message['user'] ?? null,
+            'sourcePermalink' => $permalink,
+        ]));
     }
 
     /**
@@ -144,6 +179,13 @@ final class Router
         $selectedDate = $values['due_date_block']['due_date_input']['selected_date'] ?? null;
         $dueDate = $selectedDate !== null ? new \DateTimeImmutable($selectedDate) : null;
         $important = ($values['important_block']['important_input']['selected_options'] ?? []) !== [];
+        $link = trim((string) ($values['link_block']['link_input']['value'] ?? ''));
+
+        if ($link !== '' && filter_var($link, FILTER_VALIDATE_URL) === false) {
+            return ['response_action' => 'errors', 'errors' => ['link_block' => 'Enter a valid URL.']];
+        }
+
+        $sourcePermalink = $link === '' ? null : $link;
 
         if ($taskId === null) {
             $userId = (string) ($payload['user']['id'] ?? '');
@@ -154,10 +196,18 @@ final class Router
                 $this->nextPriority($channelId),
                 $important,
                 $dueDate,
-                $userId
+                $userId,
+                $sourcePermalink
             );
         } else {
-            $this->storage->updateTaskDetails((int) $taskId, $title, $assigneeUserId, $dueDate, $important);
+            $this->storage->updateTaskDetails(
+                (int) $taskId,
+                $title,
+                $assigneeUserId,
+                $dueDate,
+                $important,
+                $sourcePermalink
+            );
         }
 
         $this->channelListService->publish($channelId);

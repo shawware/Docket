@@ -86,16 +86,18 @@ final class MySqlStorage implements StorageInterface
         string $title,
         ?string $assigneeUserId,
         ?\DateTimeImmutable $dueDate,
-        bool $important
+        bool $important,
+        ?string $sourcePermalink
     ): void {
         $statement = $this->pdo->prepare(
-            'UPDATE tasks SET title = ?, assignee_user_id = ?, due_date = ?, important = ? WHERE id = ?'
+            'UPDATE tasks SET title = ?, assignee_user_id = ?, due_date = ?, important = ?, source_permalink = ? WHERE id = ?'
         );
         $statement->execute([
             $title,
             $assigneeUserId,
             $dueDate?->format('Y-m-d'),
             $important ? 1 : 0,
+            $sourcePermalink,
             $taskId,
         ]);
     }

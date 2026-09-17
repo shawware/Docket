@@ -21,7 +21,8 @@ final class ChannelListService
         private readonly StorageInterface $storage,
         private readonly SlackApiInterface $slackApi,
         private readonly ListRenderer $listRenderer,
-        private readonly int $dueSoonWindowDays
+        private readonly int $dueSoonWindowDays,
+        private readonly int $sourceLinkMaxAgeDays
     ) {
     }
 
@@ -34,7 +35,12 @@ final class ChannelListService
     public function publish(string $channelId): void
     {
         $tasks = $this->storage->tasksForChannel($channelId);
-        $blocks = $this->listRenderer->render($tasks, new \DateTimeImmutable(), $this->dueSoonWindowDays);
+        $blocks = $this->listRenderer->render(
+            $tasks,
+            new \DateTimeImmutable(),
+            $this->dueSoonWindowDays,
+            $this->sourceLinkMaxAgeDays
+        );
 
         $listState = $this->storage->getListState($channelId);
 

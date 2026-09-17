@@ -22,7 +22,7 @@ final class ListRendererTest extends TestCase
 
     public function testEmptyListRendersOnlyTheAddTaskButton(): void
     {
-        $blocks = $this->renderer->render([], $this->now, 3);
+        $blocks = $this->renderer->render([], $this->now, 3, 90);
 
         $this->assertCount(1, $blocks);
         $this->assertSame('actions', $blocks[0]['type']);
@@ -36,7 +36,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 2, title: 'Second', priority: 2000, important: true),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
         $rows = $this->taskRowBlocks($blocks);
 
         $this->assertStringContainsString('1. First', $rows[0]['text']['text']);
@@ -51,7 +51,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 3, title: 'Not due yet', priority: 3000, dueDate: '2026-07-01'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         $this->assertStringContainsString('Overdue task', $blocks[0]['text']['text']);
         $this->assertStringNotContainsString('Due soon task', $blocks[0]['text']['text']);
@@ -69,7 +69,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 2, title: 'Overdue one day', priority: 2000, dueDate: '2026-06-14'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         $text = $blocks[0]['text']['text'];
         $this->assertLessThan(
@@ -85,7 +85,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 2, title: 'Due tomorrow', priority: 2000, dueDate: '2026-06-16'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         $text = $blocks[0]['text']['text'];
         $this->assertLessThan(
@@ -98,7 +98,7 @@ final class ListRendererTest extends TestCase
     {
         $tasks = [$this->task(id: 1, title: 'No due date', priority: 1000)];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         $this->assertSame('section', $blocks[0]['type']);
         $this->assertStringContainsString('1. No due date', $blocks[0]['text']['text']);
@@ -116,7 +116,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 2, title: 'Finished task', priority: 2000, status: 'done'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         $doneBlock = $blocks[1];
         $this->assertSame('~Finished task~', $doneBlock['text']['text']);
@@ -131,7 +131,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 3, title: 'Third', priority: 3000),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
         $rows = $this->taskRowBlocks($blocks);
 
         $this->assertSame(['1:mark_done', '1:edit_task', '1:move_down', '1:remind_me'], $this->optionValues($rows[0]));
@@ -150,7 +150,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 3, title: 'Due the day after the window', priority: 3000, dueDate: '2026-06-19'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         // No overdue callout: nothing is actually past due.
         $this->assertSame('section', $blocks[0]['type']);
@@ -165,7 +165,7 @@ final class ListRendererTest extends TestCase
     {
         $tasks = [$this->task(id: 1, title: 'Only task', priority: 1000)];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
         $rows = $this->taskRowBlocks($blocks);
 
         $this->assertSame(['1:mark_done', '1:edit_task', '1:remind_me'], $this->optionValues($rows[0]));
@@ -179,12 +179,77 @@ final class ListRendererTest extends TestCase
             $this->task(id: 3, title: 'Overdue task', priority: 3000, dueDate: '2026-06-10'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
         $rows = $this->taskRowBlocks($blocks);
 
         $this->assertStringContainsString('<@U123>', $rows[0]['text']['text']);
         $this->assertStringContainsString('Unassigned', $rows[1]['text']['text']);
         $this->assertStringContainsString('⚠️ 2026-06-10', $rows[2]['text']['text']);
+    }
+
+    public function testRowShowsASourceLinkWhenRecentButNotWhenPastTheMaxAgeWindow(): void
+    {
+        $tasks = [
+            $this->task(
+                id: 1,
+                title: 'Recent',
+                priority: 1000,
+                sourcePermalink: 'https://slack.example/archives/C1/p1',
+                createdAt: '2026-06-01' // 14 days before $this->now
+            ),
+            $this->task(
+                id: 2,
+                title: 'Old',
+                priority: 2000,
+                sourcePermalink: 'https://slack.example/archives/C1/p2',
+                createdAt: '2026-01-01' // well past a 90-day window
+            ),
+            $this->task(id: 3, title: 'No link', priority: 3000),
+        ];
+
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
+        $rows = $this->taskRowBlocks($blocks);
+
+        $this->assertStringContainsString('<https://slack.example/archives/C1/p1|🔗>', $rows[0]['text']['text']);
+        $this->assertStringNotContainsString('🔗', $rows[1]['text']['text']);
+        $this->assertStringNotContainsString('🔗', $rows[2]['text']['text']);
+    }
+
+    public function testSourceLinkAgeUsesTheMessagesOwnTimestampNotTheTasksCreatedAt(): void
+    {
+        // A recent message linked from a long-standing task (e.g. edited
+        // in by hand, or the task itself is old) — still shown, because
+        // the *message* is recent, regardless of when the task was made.
+        $recentMessageTs = (new \DateTimeImmutable('2026-06-05'))->getTimestamp(); // 10 days before $this->now
+        $recentLink = "https://my-workspace.slack.com/archives/C1/p{$recentMessageTs}";
+
+        // An old message linked from a brand-new task — hidden, because
+        // the *message* is stale, even though the task was just created.
+        $oldMessageTs = (new \DateTimeImmutable('2020-01-01'))->getTimestamp();
+        $oldLink = "https://my-workspace.slack.com/archives/C1/p{$oldMessageTs}";
+
+        $tasks = [
+            $this->task(
+                id: 1,
+                title: 'Old task, recent message',
+                priority: 1000,
+                sourcePermalink: $recentLink,
+                createdAt: '2020-01-01'
+            ),
+            $this->task(
+                id: 2,
+                title: 'New task, old message',
+                priority: 2000,
+                sourcePermalink: $oldLink,
+                createdAt: '2026-06-15'
+            ),
+        ];
+
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
+        $rows = $this->taskRowBlocks($blocks);
+
+        $this->assertStringContainsString('🔗', $rows[0]['text']['text']);
+        $this->assertStringNotContainsString('🔗', $rows[1]['text']['text']);
     }
 
     public function testAllDoneListHasNoCalloutsOrNumberedRowsJustStrikethroughAndAddTask(): void
@@ -194,7 +259,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 2, title: 'Finished two', priority: 2000, status: 'done'),
         ];
 
-        $blocks = $this->renderer->render($tasks, $this->now, 3);
+        $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
 
         $this->assertCount(3, $blocks);
         $this->assertSame('~Finished one~', $blocks[0]['text']['text']);
@@ -298,7 +363,9 @@ final class ListRendererTest extends TestCase
         ?string $assigneeUserId = null,
         bool $important = false,
         ?string $dueDate = null,
-        string $status = 'open'
+        string $status = 'open',
+        ?string $sourcePermalink = null,
+        string $createdAt = '2026-01-01'
     ): array {
         return [
             'id' => $id,
@@ -310,9 +377,9 @@ final class ListRendererTest extends TestCase
             'dueDate' => $dueDate === null ? null : new \DateTimeImmutable($dueDate),
             'status' => $status,
             'createdBy' => 'U000',
-            'createdAt' => new \DateTimeImmutable('2026-01-01'),
+            'createdAt' => new \DateTimeImmutable($createdAt),
             'completedAt' => null,
-            'sourcePermalink' => null,
+            'sourcePermalink' => $sourcePermalink,
         ];
     }
 }

@@ -8,9 +8,11 @@ namespace Shawware\Docket\Modals;
 
 /**
  * Pure builder for the add/edit-task modal's `views.open` "view" payload.
- * Blank when $task is null (add); pre-filled with the task's current
- * values otherwise (edit). Both converge on the same modal, per
- * CLAUDE.md — only the title/submit text and pre-fill differ.
+ * Add vs. edit is decided by $taskId (null means add); pre-fill values
+ * are independent of that — an add can still be pre-filled, e.g. by the
+ * "Add as task" message shortcut. Both converge on the same modal, per
+ * CLAUDE.md — only the title/submit text and whether $taskId is present
+ * (which decides create vs. update on submission) differ.
  */
 final class TaskModal
 {
@@ -23,23 +25,22 @@ final class TaskModal
 
     /**
      * @param array{
-     *     id: int,
-     *     title: string,
-     *     assigneeUserId: ?string,
-     *     important: bool,
-     *     dueDate: ?\DateTimeImmutable
-     * }|null $task null to build a blank "Add task" modal; the task's
-     *        current values to build a pre-filled "Edit task" modal.
+     *     title?: string,
+     *     assigneeUserId?: ?string,
+     *     important?: bool,
+     *     dueDate?: ?\DateTimeImmutable,
+     *     sourcePermalink?: ?string
+     * } $prefill Values to pre-fill; any key may be omitted.
      * @return array<string, mixed>
      */
-    public static function build(string $channelId, ?array $task = null): array
+    public static function build(string $channelId, ?int $taskId = null, array $prefill = []): array
     {
         return [
             'type' => 'modal',
             'callback_id' => self::CALLBACK_ID,
-            'private_metadata' => json_encode(['channelId' => $channelId, 'taskId' => $task['id'] ?? null]),
-            'title' => ['type' => 'plain_text', 'text' => $task === null ? 'Add task' : 'Edit task'],
-            'submit' => ['type' => 'plain_text', 'text' => $task === null ? 'Add' : 'Save'],
+            'private_metadata' => json_encode(['channelId' => $channelId, 'taskId' => $taskId]),
+            'title' => ['type' => 'plain_text', 'text' => $taskId === null ? 'Add task' : 'Edit task'],
+            'submit' => ['type' => 'plain_text', 'text' => $taskId === null ? 'Add' : 'Save'],
             'close' => ['type' => 'plain_text', 'text' => 'Cancel'],
             'blocks' => [
                 [
@@ -49,7 +50,7 @@ final class TaskModal
                     'element' => array_filter([
                         'type' => 'plain_text_input',
                         'action_id' => 'title_input',
-                        'initial_value' => $task['title'] ?? null,
+                        'initial_value' => $prefill['title'] ?? null,
                     ], static fn (mixed $value): bool => $value !== null),
                 ],
                 [
@@ -60,7 +61,7 @@ final class TaskModal
                     'element' => array_filter([
                         'type' => 'users_select',
                         'action_id' => 'assignee_input',
-                        'initial_user' => $task['assigneeUserId'] ?? null,
+                        'initial_user' => $prefill['assigneeUserId'] ?? null,
                     ], static fn (mixed $value): bool => $value !== null),
                 ],
                 [
@@ -71,7 +72,7 @@ final class TaskModal
                     'element' => array_filter([
                         'type' => 'datepicker',
                         'action_id' => 'due_date_input',
-                        'initial_date' => ($task['dueDate'] ?? null)?->format('Y-m-d'),
+                        'initial_date' => ($prefill['dueDate'] ?? null)?->format('Y-m-d'),
                     ], static fn (mixed $value): bool => $value !== null),
                 ],
                 [
@@ -83,7 +84,18 @@ final class TaskModal
                         'type' => 'checkboxes',
                         'action_id' => 'important_input',
                         'options' => [self::IMPORTANT_OPTION],
-                        'initial_options' => ($task['important'] ?? false) ? [self::IMPORTANT_OPTION] : null,
+                        'initial_options' => ($prefill['important'] ?? false) ? [self::IMPORTANT_OPTION] : null,
+                    ], static fn (mixed $value): bool => $value !== null),
+                ],
+                [
+                    'type' => 'input',
+                    'block_id' => 'link_block',
+                    'label' => ['type' => 'plain_text', 'text' => 'Link'],
+                    'optional' => true,
+                    'element' => array_filter([
+                        'type' => 'plain_text_input',
+                        'action_id' => 'link_input',
+                        'initial_value' => $prefill['sourcePermalink'] ?? null,
                     ], static fn (mixed $value): bool => $value !== null),
                 ],
             ],

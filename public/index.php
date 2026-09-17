@@ -68,7 +68,13 @@ $config = require $root . '/config/task.php';
 
 $storage = new MySqlStorage($pdo);
 $listRenderer = new ListRenderer();
-$channelListService = new ChannelListService($storage, $slackApi, $listRenderer, $config['dueSoonWindowDays']);
+$channelListService = new ChannelListService(
+    $storage,
+    $slackApi,
+    $listRenderer,
+    $config['dueSoonWindowDays'],
+    $config['sourceLinkMaxAgeDays']
+);
 $router = new Router($storage, $slackApi, $channelListService, $config['priorityGap']);
 
 if ($path === '/slack/interactions') {
@@ -80,6 +86,12 @@ if ($path === '/slack/interactions') {
         $result = $router->handleViewSubmission($payload);
         header('Content-Type: application/json');
         echo json_encode($result ?? new stdClass());
+        return;
+    }
+
+    if (($payload['type'] ?? null) === 'message_action') {
+        $router->handleMessageShortcut($payload);
+        http_response_code(200);
         return;
     }
 

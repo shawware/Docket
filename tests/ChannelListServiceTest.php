@@ -20,7 +20,7 @@ final class ChannelListServiceTest extends TestCase
         $storage->createTask('C1', 'First task', null, 1000, false, null, 'U1');
         $slackApi = new RecordingSlackApi();
 
-        $service = new ChannelListService($storage, $slackApi, new ListRenderer(), 3);
+        $service = new ChannelListService($storage, $slackApi, new ListRenderer(), 3, 90);
         $service->publish('C1');
 
         $this->assertSame(['joinChannel', 'postMessage', 'pinMessage'], $slackApi->calls);
@@ -37,7 +37,7 @@ final class ChannelListServiceTest extends TestCase
         $slackApi = new RecordingSlackApi();
         $slackApi->joinChannelFails = true;
 
-        $service = new ChannelListService($storage, $slackApi, new ListRenderer(), 3);
+        $service = new ChannelListService($storage, $slackApi, new ListRenderer(), 3, 90);
         $service->publish('C1');
 
         $this->assertSame(['joinChannel', 'postMessage', 'pinMessage'], $slackApi->calls);
@@ -51,7 +51,7 @@ final class ChannelListServiceTest extends TestCase
         $storage->saveListState('C1', '1699999999.000100');
         $slackApi = new RecordingSlackApi();
 
-        $service = new ChannelListService($storage, $slackApi, new ListRenderer(), 3);
+        $service = new ChannelListService($storage, $slackApi, new ListRenderer(), 3, 90);
         $service->publish('C1');
 
         $this->assertSame(['updateMessage'], $slackApi->calls);

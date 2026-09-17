@@ -259,6 +259,68 @@ final class RouterTest extends TestCase
         $this->assertNull($tasks[0]['assigneeUserId']);
         $this->assertNull($tasks[0]['dueDate']);
         $this->assertFalse($tasks[0]['important']);
+        $this->assertNull($tasks[0]['sourcePermalink']);
+    }
+
+    public function testViewSubmissionStoresAManuallyTypedLink(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'Task with a link']],
+            'link_block' => ['link_input' => ['value' => 'https://slack.example/archives/C1/p999']],
+        ]));
+
+        $tasks = $storage->tasksForChannel('C1');
+        $this->assertSame('https://slack.example/archives/C1/p999', $tasks[0]['sourcePermalink']);
+    }
+
+    public function testViewSubmissionClearsAnExistingLinkWhenTheFieldIsEmptied(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+        $task = $storage->createTask(
+            'C1',
+            'Task',
+            null,
+            1000,
+            false,
+            null,
+            'U1',
+            'https://slack.example/archives/C1/p123'
+        );
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', $task['id'], [
+            'title_block' => ['title_input' => ['value' => 'Task']],
+            'link_block' => ['link_input' => ['value' => '  ']],
+        ]));
+
+        $this->assertNull($storage->getTask($task['id'])['sourcePermalink']);
+    }
+
+    public function testViewSubmissionWithAMalformedLinkReturnsErrorsAndWritesNothing(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'Task']],
+            'link_block' => ['link_input' => ['value' => 'not a url']],
+        ]));
+
+        $this->assertSame(['response_action' => 'errors', 'errors' => ['link_block' => 'Enter a valid URL.']], $result);
+        $this->assertSame([], $storage->tasksForChannel('C1'));
+    }
+
+    public function testViewSubmissionWithASchemelessLinkReturnsErrorsAndWritesNothing(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'Task']],
+            'link_block' => ['link_input' => ['value' => 'slack.com/archives/C1/p123']],
+        ]));
+
+        $this->assertSame(['response_action' => 'errors', 'errors' => ['link_block' => 'Enter a valid URL.']], $result);
+        $this->assertSame([], $storage->tasksForChannel('C1'));
     }
 
     public function testViewSubmissionWithAnEmptyTitleReturnsErrorsAndWritesNothing(): void
@@ -292,6 +354,45 @@ final class RouterTest extends TestCase
         $result = $router->handleViewSubmission(['view' => ['callback_id' => 'some_other_modal']]);
 
         $this->assertNull($result);
+    }
+
+    public function testHandleMessageShortcutOpensAPreFilledAddModalWithAConstructedPermalink(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleMessageShortcut([
+            'type' => 'message_action',
+            'callback_id' => 'add_as_task',
+            'trigger_id' => 'trigger-3',
+            'channel' => ['id' => 'C1'],
+            'team' => ['domain' => 'my-workspace'],
+            'message' => ['text' => 'Something is broken', 'user' => 'U9', 'ts' => '1699999999.000100'],
+        ]);
+
+        $this->assertSame(['openView'], $slackApi->calls);
+        $opened = $slackApi->openedViews[0];
+        $this->assertSame('trigger-3', $opened['triggerId']);
+
+        $view = $opened['view'];
+        $this->assertSame('Add task', $view['title']['text']);
+        $this->assertNull(json_decode($view['private_metadata'], true)['taskId']);
+
+        [$titleBlock, $assigneeBlock, , , $linkBlock] = $view['blocks'];
+        $this->assertSame('Something is broken', $titleBlock['element']['initial_value']);
+        $this->assertSame('U9', $assigneeBlock['element']['initial_user']);
+        $this->assertSame(
+            'https://my-workspace.slack.com/archives/C1/p1699999999000100',
+            $linkBlock['element']['initial_value']
+        );
+    }
+
+    public function testHandleMessageShortcutIgnoresUnrelatedCallbackIds(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleMessageShortcut(['type' => 'message_action', 'callback_id' => 'some_other_shortcut']);
+
+        $this->assertSame([], $slackApi->calls);
     }
 
     /**
@@ -332,7 +433,7 @@ final class RouterTest extends TestCase
     {
         $storage = new InMemoryStorage();
         $slackApi = new RecordingSlackApi();
-        $channelListService = new ChannelListService($storage, $slackApi, new ListRenderer(), 3);
+        $channelListService = new ChannelListService($storage, $slackApi, new ListRenderer(), 3, 90);
         $router = new Router($storage, $slackApi, $channelListService, self::PRIORITY_GAP);
 
         return [$router, $storage, $slackApi];
