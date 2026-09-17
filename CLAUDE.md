@@ -41,7 +41,7 @@ Priority stays a single, always-authoritative **manual rank** (▲/▼). There i
 
 ### Slack surfaces
 
-- `POST /slack/commands` — the slash command (`/task ...`), with a standard `application/x-www-form-urlencoded` body.
+- `POST /slack/commands` — the slash command (`/docket ...`), with a standard `application/x-www-form-urlencoded` body.
 - `POST /slack/interactions` — block actions (▲/▼, done, edit, remind-me buttons), the "Add as task" message shortcut, and modal (`view_submission`) submissions (the add-task/edit modal, and the reminder modal). The body is `application/x-www-form-urlencoded`, with a single `payload` field containing JSON.
 - `POST /slack/events` — just `app_home_opened` (which renders "My Tasks") plus the one-time `url_verification` challenge.
 - Any other path (including `/`) returns a static placeholder, with HTTP 200. There is no signature check and no DB connection, and it is never a redirect.
@@ -72,7 +72,7 @@ Plus a `list_state` table, with one row per channel (`channel_id`, `message_ts`)
 
 - **Pinned per-channel list**: one bot-owned message per channel, rebuilt and pushed with `chat.update` after every mutation, and pinned once via `pins.add` when first created. Two callouts render first, each only when non-empty: "⚠️ Overdue", listing anything past its due date, most-recently-overdue first; then "⏰ Due soon", listing anything due within the configured window but not yet overdue, nearest due date first. Both are purely a computed view over the same rows below them. Below them sits the single ranked list: `N. ⭐ Title — <@assignee>` (the ⭐ appears only if `important`), with the due date shown and flagged with ⚠️ if overdue, plus ✅ Done, ✏️ Edit, ▲, ▼, and ⏰ Remind-me actions, ordered by `priority`. Done tasks (struck through) stay appended at the bottom, until the weekly cron clears them. A trailing "➕ Add task" button opens the add-task modal.
 - **Add task**, from three entry points, all converging on the same modal, scoped to the channel the action happened in:
-  1. `/task Fix the login bug` — a slash command, adding to the bottom of the current channel's list.
+  1. `/docket Fix the login bug` — a slash command, adding to the bottom of the current channel's list.
   2. The "➕ Add task" button on the list message.
   3. The "Add as task" message shortcut, on any message — a modal pre-filled with the message text, permalink, and the message's author as a suggested assignee.
   The modal collects the title, assignee, due date, and the Important toggle.
@@ -88,7 +88,7 @@ Plus a `list_state` table, with one row per channel (`channel_id`, `message_ts`)
 
 1. The `tasks` and `list_state` tables, the migration runner, and a storage layer behind an interface (real and in-memory, contract-tested against both).
 2. A pure function: `tasks[]` to Block Kit JSON, for the pinned list — the ranked list, plus the computed "Due soon" callout and the Important badge — unit-tested with no Slack calls.
-3. The slash command (`/task <title>`) — the simplest add path (bottom of the list), proving the storage-plus-render loop end-to-end.
+3. The slash command (`/docket <title>`) — the simplest add path (bottom of the list), proving the storage-plus-render loop end-to-end.
 4. Block actions: reorder and done — proving the `chat.update` round-trip.
 5. Modals: the add/edit-task modal (title, assignee, due date, Important), and the reminder modal.
 6. The message shortcut, going to the same add-task modal, pre-filled.

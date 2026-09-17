@@ -12,6 +12,7 @@
         <include>
             <directory>src</directory>
             <directory>storage</directory>
+            <file>docket.php</file>
         </include>
     </source>
 </phpunit>
