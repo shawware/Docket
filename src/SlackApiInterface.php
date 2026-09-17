@@ -59,4 +59,12 @@ interface SlackApiInterface
      * the assignment notification and weekly digest.
      */
     public function openDm(string $userId): string;
+
+    /**
+     * Publishes the App Home "My Tasks" tab for a user — replaces
+     * whatever was there before, in full, every time.
+     *
+     * @param array<string, mixed> $view
+     */
+    public function publishView(string $userId, array $view): void;
 }

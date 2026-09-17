@@ -100,6 +100,14 @@ final class SlackApi implements SlackApiInterface
         return (string) $body['channel']['id'];
     }
 
+    public function publishView(string $userId, array $view): void
+    {
+        $this->call('views.publish', [
+            'user_id' => $userId,
+            'view' => $view,
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $json
      * @return array<string, mixed>

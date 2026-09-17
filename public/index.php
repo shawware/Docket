@@ -51,13 +51,6 @@ if (!$slackApi->verifySignature($signingSecret, $timestamp, $rawBody, $signature
     return;
 }
 
-if ($path === '/slack/events') {
-    // Not wired up yet — acknowledge with an empty 200, now that the
-    // signature is verified, so Slack does not retry.
-    http_response_code(200);
-    return;
-}
-
 $pdo = new PDO(
     (string) envValue('DB_DSN'),
     envValue('DB_USER'),
@@ -77,7 +70,25 @@ $channelListService = new ChannelListService(
     $config['sourceLinkMaxAgeDays']
 );
 $assignmentNotifier = new AssignmentNotifier($slackApi);
-$router = new Router($storage, $slackApi, $channelListService, $assignmentNotifier, $config['priorityGap']);
+$router = new Router(
+    $storage,
+    $slackApi,
+    $channelListService,
+    $assignmentNotifier,
+    $listRenderer,
+    $config['priorityGap']
+);
+
+if ($path === '/slack/events') {
+    $challenge = $router->handleEvent(json_decode($rawBody, true) ?: []);
+
+    if ($challenge !== null) {
+        header('Content-Type: text/plain');
+        echo $challenge;
+    }
+
+    return;
+}
 
 if ($path === '/slack/interactions') {
     parse_str($rawBody, $formFields);

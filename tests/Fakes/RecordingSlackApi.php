@@ -34,6 +34,9 @@ final class RecordingSlackApi implements SlackApiInterface
 
     public string $nextDmChannel = 'D123';
 
+    /** @var array<int, array{userId: string, view: array<string, mixed>}> */
+    public array $publishedViews = [];
+
     public function verifySignature(string $signingSecret, string $timestamp, string $rawBody, string $signatureHeader): bool
     {
         return true;
@@ -78,5 +81,11 @@ final class RecordingSlackApi implements SlackApiInterface
         $this->openedDms[] = $userId;
 
         return $this->nextDmChannel;
+    }
+
+    public function publishView(string $userId, array $view): void
+    {
+        $this->calls[] = 'publishView';
+        $this->publishedViews[] = ['userId' => $userId, 'view' => $view];
     }
 }

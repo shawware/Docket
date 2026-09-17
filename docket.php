@@ -24,6 +24,7 @@ final class Router
         private readonly SlackApiInterface $slackApi,
         private readonly ChannelListService $channelListService,
         private readonly AssignmentNotifier $assignmentNotifier,
+        private readonly ListRenderer $listRenderer,
         private readonly int $priorityGap
     ) {
     }
@@ -145,6 +146,46 @@ final class Router
             'assigneeUserId' => $message['user'] ?? null,
             'sourcePermalink' => $permalink,
         ]));
+    }
+
+    /**
+     * Handles a decoded Slack Events API payload: the one-time
+     * `url_verification` handshake, and `app_home_opened` (which
+     * publishes the read-only "My Tasks" App Home tab).
+     *
+     * @param array<string, mixed> $payload
+     * @return string|null The challenge string to echo back for
+     *         `url_verification`, or null otherwise (the caller should
+     *         just respond HTTP 200 with an empty body).
+     */
+    public function handleEvent(array $payload): ?string
+    {
+        if (($payload['type'] ?? null) === 'url_verification') {
+            return is_string($payload['challenge'] ?? null) ? $payload['challenge'] : null;
+        }
+
+        if (($payload['type'] ?? null) !== 'event_callback') {
+            return null;
+        }
+
+        $event = $payload['event'] ?? [];
+
+        // app_home_opened also fires for the Messages tab, not just Home —
+        // republishing there would be wasted work for a tab we don't use.
+        if (!is_array($event) || ($event['type'] ?? null) !== 'app_home_opened' || ($event['tab'] ?? 'home') !== 'home') {
+            return null;
+        }
+
+        $userId = (string) ($event['user'] ?? '');
+        $tasks = $this->storage->tasksForAssignee($userId);
+        $blocks = $this->listRenderer->renderMyTasks($tasks);
+
+        $this->slackApi->publishView($userId, [
+            'type' => 'home',
+            'blocks' => $blocks,
+        ]);
+
+        return null;
     }
 
     /**

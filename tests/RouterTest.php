@@ -501,6 +501,87 @@ final class RouterTest extends TestCase
         $this->assertSame([], $slackApi->calls);
     }
 
+    public function testHandleEventEchoesTheUrlVerificationChallenge(): void
+    {
+        [$router] = $this->makeRouter();
+
+        $challenge = $router->handleEvent(['type' => 'url_verification', 'challenge' => 'abc123']);
+
+        $this->assertSame('abc123', $challenge);
+    }
+
+    public function testHandleEventUrlVerificationWithAMissingChallengeReturnsNull(): void
+    {
+        [$router] = $this->makeRouter();
+
+        $this->assertNull($router->handleEvent(['type' => 'url_verification']));
+    }
+
+    public function testHandleEventOnAppHomeOpenedPublishesMyTasksForThatUser(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+        $storage->createTask('C1', 'My task', 'U9', 1000, false, null, 'U1');
+        $storage->createTask('C1', 'Someone else\'s task', 'U1', 2000, false, null, 'U1');
+
+        $result = $router->handleEvent([
+            'type' => 'event_callback',
+            'event' => ['type' => 'app_home_opened', 'user' => 'U9', 'tab' => 'home'],
+        ]);
+
+        $this->assertNull($result);
+        $this->assertSame(['publishView'], $slackApi->calls);
+        $published = $slackApi->publishedViews[0];
+        $this->assertSame('U9', $published['userId']);
+        $this->assertSame('home', $published['view']['type']);
+        $blocksText = json_encode($published['view']['blocks']);
+        $this->assertStringContainsString('My task', $blocksText);
+        $this->assertStringNotContainsString('Someone else', $blocksText);
+    }
+
+    public function testHandleEventIgnoresAppHomeOpenedForTheMessagesTab(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleEvent([
+            'type' => 'event_callback',
+            'event' => ['type' => 'app_home_opened', 'user' => 'U9', 'tab' => 'messages'],
+        ]);
+
+        $this->assertSame([], $slackApi->calls);
+    }
+
+    public function testHandleEventTreatsAMissingTabAsHome(): void
+    {
+        // Slack docs: the "tab" field defaults to "home" when absent.
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleEvent([
+            'type' => 'event_callback',
+            'event' => ['type' => 'app_home_opened', 'user' => 'U9'],
+        ]);
+
+        $this->assertSame(['publishView'], $slackApi->calls);
+    }
+
+    public function testHandleEventIgnoresUnrelatedEventTypes(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleEvent(['type' => 'event_callback', 'event' => ['type' => 'message']]);
+
+        $this->assertSame([], $slackApi->calls);
+    }
+
+    public function testHandleEventIgnoresPayloadsThatAreNeitherVerificationNorEventCallback(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $result = $router->handleEvent(['type' => 'something_else']);
+
+        $this->assertNull($result);
+        $this->assertSame([], $slackApi->calls);
+    }
+
     /**
      * @param array<string, mixed> $values
      * @return array<string, mixed>
@@ -541,7 +622,14 @@ final class RouterTest extends TestCase
         $slackApi = new RecordingSlackApi();
         $channelListService = new ChannelListService($storage, $slackApi, new ListRenderer(), 3, 90);
         $assignmentNotifier = new AssignmentNotifier($slackApi);
-        $router = new Router($storage, $slackApi, $channelListService, $assignmentNotifier, self::PRIORITY_GAP);
+        $router = new Router(
+            $storage,
+            $slackApi,
+            $channelListService,
+            $assignmentNotifier,
+            new ListRenderer(),
+            self::PRIORITY_GAP
+        );
 
         return [$router, $storage, $slackApi];
     }
