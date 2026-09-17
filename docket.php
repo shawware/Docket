@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Shawware\Docket;
 
+use Shawware\Docket\Modals\ReminderModal;
 use Shawware\Docket\Modals\TaskModal;
 use Shawware\Docket\Storage\StorageInterface;
 
@@ -64,7 +65,7 @@ final class Router
     /**
      * Handles a `block_actions` payload: the "➕ Add task" button, or one
      * of the pinned list's row overflow menu options (Done, Edit, Move
-     * up, Move down, Reopen — Remind me isn't handled yet).
+     * up, Move down, Reopen, Remind me).
      *
      * @param array<string, mixed> $payload
      */
@@ -94,6 +95,16 @@ final class Router
 
             if ($task !== null) {
                 $this->slackApi->openView($triggerId, TaskModal::build($channelId, $task['id'], $task));
+            }
+
+            return;
+        }
+
+        if ($taskAction === 'remind_me') {
+            $task = $this->storage->getTask($taskId);
+
+            if ($task !== null) {
+                $this->slackApi->openView($triggerId, ReminderModal::build($channelId, $taskId, $task['title']));
             }
 
             return;
@@ -189,9 +200,8 @@ final class Router
     }
 
     /**
-     * Handles the add/edit-task modal's `view_submission`. Add vs. edit
-     * is decided by whether `private_metadata` carries a task id — set
-     * by handleBlockAction() when it opened the modal.
+     * Handles a modal's `view_submission` — the add/edit-task modal or the
+     * reminder modal, distinguished by `callback_id`.
      *
      * @param array<string, mixed> $payload
      * @return array{response_action: string, errors: array<string, string>}|null
@@ -201,8 +211,13 @@ final class Router
     public function handleViewSubmission(array $payload): ?array
     {
         $view = $payload['view'] ?? [];
+        $callbackId = $view['callback_id'] ?? null;
 
-        if (($view['callback_id'] ?? null) !== TaskModal::CALLBACK_ID) {
+        if ($callbackId === ReminderModal::CALLBACK_ID) {
+            return $this->handleReminderSubmission($payload, $view);
+        }
+
+        if ($callbackId !== TaskModal::CALLBACK_ID) {
             return null;
         }
 
@@ -257,6 +272,45 @@ final class Router
 
         $this->channelListService->publish($channelId);
         $this->maybeNotifyAssignee($assigneeUserId, $previousAssigneeUserId, $title, $channelId, $actorUserId);
+
+        return null;
+    }
+
+    /**
+     * Handles the reminder modal's `view_submission`: sets a native
+     * Slack reminder for whoever submitted it (the clicking user, not
+     * necessarily the task's assignee — a shared pinned message can't
+     * show a different menu per viewer).
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $view
+     * @return array{response_action: string, errors: array<string, string>}|null
+     */
+    private function handleReminderSubmission(array $payload, array $view): ?array
+    {
+        $values = $view['state']['values'] ?? [];
+        $selectedTimestamp = $values['when_block']['when_input']['selected_date_time'] ?? null;
+
+        if ($selectedTimestamp === null) {
+            return ['response_action' => 'errors', 'errors' => ['when_block' => 'Choose a date and time.']];
+        }
+
+        $metadata = json_decode((string) ($view['private_metadata'] ?? '{}'), true);
+        $channelId = (string) ($metadata['channelId'] ?? '');
+        $taskId = (int) ($metadata['taskId'] ?? 0);
+        $actorUserId = (string) ($payload['user']['id'] ?? '');
+
+        $task = $this->storage->getTask($taskId);
+        $taskTitle = $task['title'] ?? 'a task';
+
+        $text = "Reminder: {$taskTitle}";
+        $listState = $this->storage->getListState($channelId);
+        if ($listState !== null) {
+            $link = SlackPermalink::forMessage($channelId, $listState['messageTs']);
+            $text .= " — <{$link}|View the list>";
+        }
+
+        $this->slackApi->addReminder($actorUserId, $text, (int) $selectedTimestamp);
 
         return null;
     }

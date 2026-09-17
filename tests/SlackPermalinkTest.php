@@ -63,4 +63,23 @@ final class SlackPermalinkTest extends TestCase
     {
         $this->assertNull(SlackPermalink::messageTimestamp('see the bug report'));
     }
+
+    public function testForMessageBuildsTheExpectedLinkShape(): void
+    {
+        $link = SlackPermalink::forMessage('C1', '1699999999.000100');
+
+        $this->assertSame('https://slack.com/archives/C1/p1699999999000100', $link);
+    }
+
+    public function testForMessageRoundTripsWithMessageTimestamp(): void
+    {
+        // The two directions (build a link, parse a link) must agree with
+        // each other, not just with some external Slack convention.
+        $link = SlackPermalink::forMessage('C1', '1699999999.000100');
+
+        $parsed = SlackPermalink::messageTimestamp($link);
+
+        $this->assertNotNull($parsed);
+        $this->assertSame(1699999999, $parsed->getTimestamp());
+    }
 }

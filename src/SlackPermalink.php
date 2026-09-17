@@ -29,4 +29,16 @@ final class SlackPermalink
 
         return (new \DateTimeImmutable())->setTimestamp((int) $matches[1]);
     }
+
+    /**
+     * Builds a link back to Docket's own pinned list message, from the
+     * `channel_id`/`message_ts` already in storage — no `chat.getPermalink`
+     * call needed. Uses the generic `slack.com` host, which auto-redirects
+     * a logged-in user to their own workspace; this is only ever clicked
+     * from inside Slack, unlike a real message permalink shared outside it.
+     */
+    public static function forMessage(string $channelId, string $messageTs): string
+    {
+        return 'https://slack.com/archives/' . $channelId . '/p' . str_replace('.', '', $messageTs);
+    }
 }

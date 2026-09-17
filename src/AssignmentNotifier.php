@@ -29,7 +29,7 @@ final class AssignmentNotifier
         $text = "You were assigned a task in <#{$channelId}>:\n*{$taskTitle}*";
 
         if ($listMessageTs !== null) {
-            $link = 'https://slack.com/archives/' . $channelId . '/p' . str_replace('.', '', $listMessageTs);
+            $link = SlackPermalink::forMessage($channelId, $listMessageTs);
             $text .= "\n<{$link}|View the list>";
         }
 

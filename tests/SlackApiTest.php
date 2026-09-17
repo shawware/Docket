@@ -212,6 +212,26 @@ final class SlackApiTest extends TestCase
         );
     }
 
+    public function testAddReminderCallsRemindersAddWithTheRightPayload(): void
+    {
+        $history = [];
+        $slackApi = $this->makeSlackApiWithMockedHttp(
+            new Response(200, [], json_encode(['ok' => true])),
+            $history
+        );
+
+        $slackApi->addReminder('U123', 'Reminder text', 1700000000);
+
+        $this->assertCount(1, $history);
+        $request = $history[0]['request'];
+
+        $this->assertSame('https://slack.com/api/reminders.add', (string) $request->getUri());
+        $this->assertSame(
+            ['text' => 'Reminder text', 'time' => 1700000000, 'user' => 'U123'],
+            json_decode((string) $request->getBody(), true)
+        );
+    }
+
     public function testPostMessageThrowsWhenSlackReturnsOkFalse(): void
     {
         $history = [];
