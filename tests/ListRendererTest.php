@@ -120,7 +120,7 @@ final class ListRendererTest extends TestCase
 
         $doneBlock = $blocks[1];
         $this->assertSame('~Finished task~', $doneBlock['text']['text']);
-        $this->assertArrayNotHasKey('accessory', $doneBlock);
+        $this->assertSame([['text' => ['type' => 'plain_text', 'text' => '↩️ Reopen', 'emoji' => true], 'value' => '2:reopen']], $doneBlock['accessory']['options']);
     }
 
     public function testTopRowHasNoMoveUpAndBottomRowHasNoMoveDown(): void
@@ -252,9 +252,13 @@ final class ListRendererTest extends TestCase
      */
     private function taskRowBlocks(array $blocks): array
     {
+        // Open-row menus always include mark_done; done rows only ever
+        // carry the single reopen option — this distinguishes the two.
         return array_values(array_filter(
             $blocks,
-            static fn (array $block): bool => $block['type'] === 'section' && isset($block['accessory'])
+            static fn (array $block): bool => $block['type'] === 'section'
+                && isset($block['accessory'])
+                && str_ends_with((string) $block['accessory']['options'][0]['value'], ':mark_done')
         ));
     }
 

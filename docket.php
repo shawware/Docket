@@ -15,6 +15,9 @@ use Shawware\Docket\Storage\StorageInterface;
  */
 final class Router
 {
+    /** @var array<int, string> action_ids handled from the row overflow menu. */
+    private const HANDLED_TASK_MENU_ACTIONS = ['mark_done', 'move_up', 'move_down', 'reopen'];
+
     public function __construct(
         private readonly StorageInterface $storage,
         private readonly ChannelListService $channelListService,
@@ -55,6 +58,42 @@ final class Router
         $this->channelListService->publish($channelId);
 
         return $this->textResponse("Added: {$title}");
+    }
+
+    /**
+     * Handles a `block_actions` payload from the pinned list's row
+     * overflow menu: Done, Move up, Move down, or Reopen. Edit and
+     * Remind-me options also exist on the menu but aren't handled yet
+     * (Phase 5) — anything not in HANDLED_TASK_MENU_ACTIONS is ignored.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function handleBlockAction(array $payload): void
+    {
+        $action = $payload['actions'][0] ?? [];
+
+        if (($action['action_id'] ?? null) !== 'task_menu') {
+            return;
+        }
+
+        $value = (string) ($action['selected_option']['value'] ?? '');
+        $parts = explode(':', $value, 2);
+        $taskId = (int) ($parts[0] ?? 0);
+        $taskAction = $parts[1] ?? '';
+
+        if (!in_array($taskAction, self::HANDLED_TASK_MENU_ACTIONS, true)) {
+            return;
+        }
+
+        match ($taskAction) {
+            'mark_done' => $this->storage->markDone($taskId),
+            'move_up' => $this->storage->swapPriority($taskId, 'up'),
+            'move_down' => $this->storage->swapPriority($taskId, 'down'),
+            'reopen' => $this->storage->reopenTask($taskId),
+        };
+
+        $channelId = (string) ($payload['channel']['id'] ?? '');
+        $this->channelListService->publish($channelId);
     }
 
     /** @return array{response_type: string, text: string} */

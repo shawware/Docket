@@ -201,6 +201,21 @@ abstract class StorageContractTestCase extends TestCase
         $this->assertCount(1, $storage->tasksForChannel('C1'), 'the row must still be present until swept');
     }
 
+    public function testReopenTaskSetsStatusBackToOpenAndClearsCompletedAtWithoutTouchingPriority(): void
+    {
+        $storage = $this->createStorage();
+        $created = $storage->createTask('C1', 'Task', null, 1000, false, null, 'U1');
+        $storage->markDone($created['id']);
+
+        $storage->reopenTask($created['id']);
+
+        $updated = $storage->getTask($created['id']);
+
+        $this->assertSame('open', $updated['status']);
+        $this->assertNull($updated['completedAt']);
+        $this->assertSame(1000, $updated['priority']);
+    }
+
     public function testChannelsWithOpenTasksListsOnlyChannelsWithAnOpenTask(): void
     {
         $storage = $this->createStorage();

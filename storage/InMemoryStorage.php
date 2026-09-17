@@ -143,6 +143,12 @@ final class InMemoryStorage implements StorageInterface
         $this->tasks[$taskId]['completedAt'] = new \DateTimeImmutable();
     }
 
+    public function reopenTask(int $taskId): void
+    {
+        $this->tasks[$taskId]['status'] = 'open';
+        $this->tasks[$taskId]['completedAt'] = null;
+    }
+
     public function channelsWithOpenTasks(): array
     {
         $channels = array_unique(array_map(

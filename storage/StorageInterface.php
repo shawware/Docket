@@ -140,6 +140,14 @@ interface StorageInterface
     public function markDone(int $taskId): void;
 
     /**
+     * Undoes markDone(): sets a task back to 'open' and clears
+     * `completedAt`. `priority` is untouched, same as every other
+     * status-only mutation. Only useful before sweepDoneTasks() removes
+     * the row — after that, there's nothing left to reopen.
+     */
+    public function reopenTask(int $taskId): void;
+
+    /**
      * Channel ids with at least one open task — for the weekly digest's
      * per-channel unassigned summary and the pinned-list sweep.
      *

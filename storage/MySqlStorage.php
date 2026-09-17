@@ -146,6 +146,14 @@ final class MySqlStorage implements StorageInterface
         $statement->execute([(new \DateTimeImmutable())->format('Y-m-d H:i:s'), $taskId]);
     }
 
+    public function reopenTask(int $taskId): void
+    {
+        $statement = $this->pdo->prepare(
+            "UPDATE tasks SET status = 'open', completed_at = NULL WHERE id = ?"
+        );
+        $statement->execute([$taskId]);
+    }
+
     public function channelsWithOpenTasks(): array
     {
         return $this->pdo

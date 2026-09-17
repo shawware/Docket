@@ -50,9 +50,8 @@ if (!$slackApi->verifySignature($signingSecret, $timestamp, $rawBody, $signature
     return;
 }
 
-if ($path !== '/slack/commands') {
-    // Block actions (/slack/interactions) and events (/slack/events) are
-    // not wired up yet — acknowledge with an empty 200, now that the
+if ($path === '/slack/events') {
+    // Not wired up yet — acknowledge with an empty 200, now that the
     // signature is verified, so Slack does not retry.
     http_response_code(200);
     return;
@@ -71,6 +70,14 @@ $storage = new MySqlStorage($pdo);
 $listRenderer = new ListRenderer();
 $channelListService = new ChannelListService($storage, $slackApi, $listRenderer, $config['dueSoonWindowDays']);
 $router = new Router($storage, $channelListService, $config['priorityGap']);
+
+if ($path === '/slack/interactions') {
+    parse_str($rawBody, $formFields);
+    $payload = json_decode((string) ($formFields['payload'] ?? '{}'), true);
+    $router->handleBlockAction(is_array($payload) ? $payload : []);
+    http_response_code(200);
+    return;
+}
 
 parse_str($rawBody, $payload);
 header('Content-Type: application/json');

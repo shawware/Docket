@@ -24,6 +24,7 @@ final class ListRenderer
         'move_up' => '▲ Move up',
         'move_down' => '▼ Move down',
         'remind_me' => '⏰ Remind me',
+        'reopen' => '↩️ Reopen',
     ];
 
     /**
@@ -72,6 +73,14 @@ final class ListRenderer
             $blocks[] = [
                 'type' => 'section',
                 'text' => ['type' => 'mrkdwn', 'text' => '~' . $task['title'] . '~'],
+                'accessory' => [
+                    'type' => 'overflow',
+                    'action_id' => 'task_menu',
+                    'options' => [[
+                        'text' => ['type' => 'plain_text', 'text' => self::ACTION_LABELS['reopen'], 'emoji' => true],
+                        'value' => $task['id'] . ':reopen',
+                    ]],
+                ],
             ];
         }
 
