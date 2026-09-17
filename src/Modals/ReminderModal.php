@@ -17,7 +17,7 @@ final class ReminderModal
 {
     public const CALLBACK_ID = 'reminder_modal';
 
-    public static function build(string $channelId, int $taskId, string $taskTitle): array
+    public static function build(string $channelId, int $taskId, string $taskTitle, \DateTimeImmutable $now): array
     {
         return [
             'type' => 'modal',
@@ -38,6 +38,7 @@ final class ReminderModal
                     'element' => [
                         'type' => 'datetimepicker',
                         'action_id' => 'when_input',
+                        'initial_date_time' => $now->modify('+1 hour')->getTimestamp(),
                     ],
                 ],
             ],

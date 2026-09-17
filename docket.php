@@ -104,7 +104,10 @@ final class Router
             $task = $this->storage->getTask($taskId);
 
             if ($task !== null) {
-                $this->slackApi->openView($triggerId, ReminderModal::build($channelId, $taskId, $task['title']));
+                $this->slackApi->openView(
+                    $triggerId,
+                    ReminderModal::build($channelId, $taskId, $task['title'], new \DateTimeImmutable())
+                );
             }
 
             return;

@@ -13,7 +13,9 @@ final class ReminderModalTest extends TestCase
 {
     public function testBuildProducesADatetimepickerModalCarryingTheTaskInMetadata(): void
     {
-        $view = ReminderModal::build('C1', 42, 'Fix the login bug');
+        $now = new \DateTimeImmutable('2026-06-15 09:00:00');
+
+        $view = ReminderModal::build('C1', 42, 'Fix the login bug', $now);
 
         $this->assertSame('reminder_modal', $view['callback_id']);
         $this->assertSame(['channelId' => 'C1', 'taskId' => 42], json_decode($view['private_metadata'], true));
@@ -23,5 +25,15 @@ final class ReminderModalTest extends TestCase
         $this->assertSame('when_block', $whenBlock['block_id']);
         $this->assertSame('datetimepicker', $whenBlock['element']['type']);
         $this->assertSame('when_input', $whenBlock['element']['action_id']);
+    }
+
+    public function testBuildDefaultsTheInitialDateTimeToOneHourFromNow(): void
+    {
+        $now = new \DateTimeImmutable('2026-06-15 09:00:00');
+
+        $view = ReminderModal::build('C1', 42, 'Fix the login bug', $now);
+
+        $expected = (new \DateTimeImmutable('2026-06-15 10:00:00'))->getTimestamp();
+        $this->assertSame($expected, $view['blocks'][1]['element']['initial_date_time']);
     }
 }
