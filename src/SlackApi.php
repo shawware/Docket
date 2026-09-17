@@ -53,6 +53,8 @@ final class SlackApi implements SlackApiInterface
             'channel' => $channel,
             'blocks' => $blocks,
             'text' => $fallbackText,
+            'unfurl_links' => false,
+            'unfurl_media' => false,
         ]);
 
         return (string) $body['ts'];
@@ -65,6 +67,8 @@ final class SlackApi implements SlackApiInterface
             'ts' => $ts,
             'blocks' => $blocks,
             'text' => $fallbackText,
+            'unfurl_links' => false,
+            'unfurl_media' => false,
         ]);
     }
 

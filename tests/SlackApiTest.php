@@ -79,7 +79,13 @@ final class SlackApiTest extends TestCase
         $this->assertSame('https://slack.com/api/chat.postMessage', (string) $request->getUri());
         $this->assertSame('Bearer test-bot-token', $request->getHeaderLine('Authorization'));
         $this->assertSame(
-            ['channel' => 'C123', 'blocks' => [['type' => 'section']], 'text' => 'fallback'],
+            [
+                'channel' => 'C123',
+                'blocks' => [['type' => 'section']],
+                'text' => 'fallback',
+                'unfurl_links' => false,
+                'unfurl_media' => false,
+            ],
             json_decode((string) $request->getBody(), true)
         );
     }
@@ -99,7 +105,14 @@ final class SlackApiTest extends TestCase
 
         $this->assertSame('https://slack.com/api/chat.update', (string) $request->getUri());
         $this->assertSame(
-            ['channel' => 'C123', 'ts' => '1699999999.000100', 'blocks' => [['type' => 'section']], 'text' => 'fallback'],
+            [
+                'channel' => 'C123',
+                'ts' => '1699999999.000100',
+                'blocks' => [['type' => 'section']],
+                'text' => 'fallback',
+                'unfurl_links' => false,
+                'unfurl_media' => false,
+            ],
             json_decode((string) $request->getBody(), true)
         );
     }
