@@ -67,10 +67,4 @@ interface SlackApiInterface
      * @param array<string, mixed> $view
      */
     public function publishView(string $userId, array $view): void;
-
-    /**
-     * Sets a native Slack reminder for a user — shows up in their own
-     * Slack Reminders, with no Docket-side storage needed.
-     */
-    public function addReminder(string $userId, string $text, int $timeUnixTs): void;
 }

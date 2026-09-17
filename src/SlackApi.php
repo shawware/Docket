@@ -108,15 +108,6 @@ final class SlackApi implements SlackApiInterface
         ]);
     }
 
-    public function addReminder(string $userId, string $text, int $timeUnixTs): void
-    {
-        $this->call('reminders.add', [
-            'text' => $text,
-            'time' => $timeUnixTs,
-            'user' => $userId,
-        ]);
-    }
-
     /**
      * @param array<string, mixed> $json
      * @return array<string, mixed>

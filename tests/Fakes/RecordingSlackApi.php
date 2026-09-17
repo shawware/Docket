@@ -39,9 +39,6 @@ final class RecordingSlackApi implements SlackApiInterface
     /** @var array<int, array{userId: string, view: array<string, mixed>}> */
     public array $publishedViews = [];
 
-    /** @var array<int, array{userId: string, text: string, timeUnixTs: int}> */
-    public array $addedReminders = [];
-
     public function verifySignature(string $signingSecret, string $timestamp, string $rawBody, string $signatureHeader): bool
     {
         return true;
@@ -96,11 +93,5 @@ final class RecordingSlackApi implements SlackApiInterface
     {
         $this->calls[] = 'publishView';
         $this->publishedViews[] = ['userId' => $userId, 'view' => $view];
-    }
-
-    public function addReminder(string $userId, string $text, int $timeUnixTs): void
-    {
-        $this->calls[] = 'addReminder';
-        $this->addedReminders[] = ['userId' => $userId, 'text' => $text, 'timeUnixTs' => $timeUnixTs];
     }
 }

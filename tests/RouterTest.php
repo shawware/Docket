@@ -163,32 +163,6 @@ final class RouterTest extends TestCase
         $this->assertSame([], $slackApi->calls);
     }
 
-    public function testHandleBlockActionOpensTheReminderModal(): void
-    {
-        [$router, $storage, $slackApi] = $this->makeRouter();
-        $task = $storage->createTask('C1', 'Task', null, 1000, false, null, 'U1');
-
-        $router->handleBlockAction(array_merge(
-            $this->blockActionPayload('C1', $task['id'] . ':remind_me'),
-            ['trigger_id' => 'trigger-4']
-        ));
-
-        $this->assertSame(['openView'], $slackApi->calls);
-        $view = $slackApi->openedViews[0]['view'];
-        $this->assertSame('trigger-4', $slackApi->openedViews[0]['triggerId']);
-        $this->assertSame('reminder_modal', $view['callback_id']);
-        $this->assertSame($task['id'], json_decode($view['private_metadata'], true)['taskId']);
-    }
-
-    public function testHandleBlockActionRemindMeIgnoresAnUnknownTaskId(): void
-    {
-        [$router, , $slackApi] = $this->makeRouter();
-
-        $router->handleBlockAction($this->blockActionPayload('C1', '999999:remind_me'));
-
-        $this->assertSame([], $slackApi->calls);
-    }
-
     public function testHandleBlockActionOpensABlankModalForAddTask(): void
     {
         [$router, , $slackApi] = $this->makeRouter();
@@ -642,86 +616,6 @@ final class RouterTest extends TestCase
 
         $this->assertNull($result);
         $this->assertSame([], $slackApi->calls);
-    }
-
-    public function testReminderSubmissionCallsAddReminderForTheSubmittingUser(): void
-    {
-        [$router, $storage, $slackApi] = $this->makeRouter();
-        $task = $storage->createTask('C1', 'Fix the login bug', 'U9', 1000, false, null, 'U1');
-        $storage->saveListState('C1', '1699999999.000100');
-
-        $result = $router->handleViewSubmission($this->reminderSubmissionPayload('C1', $task['id'], 'U2', 1700000000));
-
-        $this->assertNull($result);
-        $this->assertSame(['addReminder'], $slackApi->calls);
-        $reminder = $slackApi->addedReminders[0];
-        $this->assertSame('U2', $reminder['userId']);
-        $this->assertSame(1700000000, $reminder['timeUnixTs']);
-        $this->assertStringContainsString('Fix the login bug', $reminder['text']);
-        $this->assertStringContainsString(
-            'https://slack.com/archives/C1/p1699999999000100',
-            $reminder['text']
-        );
-    }
-
-    public function testReminderSubmissionWithNoListStateYetOmitsTheListLink(): void
-    {
-        [$router, $storage, $slackApi] = $this->makeRouter();
-        $task = $storage->createTask('C1', 'Fix the login bug', 'U9', 1000, false, null, 'U1');
-
-        $router->handleViewSubmission($this->reminderSubmissionPayload('C1', $task['id'], 'U2', 1700000000));
-
-        $this->assertStringNotContainsString('View the list', $slackApi->addedReminders[0]['text']);
-    }
-
-    public function testReminderSubmissionForAStaleTaskIdStillSetsAGenericReminder(): void
-    {
-        [$router, , $slackApi] = $this->makeRouter();
-
-        $result = $router->handleViewSubmission($this->reminderSubmissionPayload('C1', 999999, 'U2', 1700000000));
-
-        $this->assertNull($result);
-        $this->assertSame(['addReminder'], $slackApi->calls);
-        $this->assertStringContainsString('a task', $slackApi->addedReminders[0]['text']);
-    }
-
-    public function testReminderSubmissionWithNoDateTimeChosenReturnsErrors(): void
-    {
-        [$router, , $slackApi] = $this->makeRouter();
-
-        $result = $router->handleViewSubmission([
-            'type' => 'view_submission',
-            'user' => ['id' => 'U2'],
-            'view' => [
-                'callback_id' => 'reminder_modal',
-                'private_metadata' => json_encode(['channelId' => 'C1', 'taskId' => 1]),
-                'state' => ['values' => []],
-            ],
-        ]);
-
-        $this->assertSame(
-            ['response_action' => 'errors', 'errors' => ['when_block' => 'Choose a date and time.']],
-            $result
-        );
-        $this->assertSame([], $slackApi->calls);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function reminderSubmissionPayload(string $channelId, int $taskId, string $actorUserId, int $timestamp): array
-    {
-        return [
-            'type' => 'view_submission',
-            'user' => ['id' => $actorUserId],
-            'view' => [
-                'callback_id' => 'reminder_modal',
-                'private_metadata' => json_encode(['channelId' => $channelId, 'taskId' => $taskId]),
-                'state' => ['values' => [
-                    'when_block' => ['when_input' => ['selected_date_time' => $timestamp]],
-                ]],
-            ],
-        ];
     }
 
     /**

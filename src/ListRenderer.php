@@ -23,7 +23,6 @@ final class ListRenderer
         'edit_task' => '✏️ Edit',
         'move_up' => '▲ Move up',
         'move_down' => '▼ Move down',
-        'remind_me' => '⏰ Remind me',
         'reopen' => '↩️ Reopen',
     ];
 
@@ -235,7 +234,6 @@ final class ListRenderer
         if (!$isLast) {
             $actions[] = 'move_down';
         }
-        $actions[] = 'remind_me';
 
         $options = array_map(
             static fn (string $action): array => [

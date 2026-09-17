@@ -134,12 +134,12 @@ final class ListRendererTest extends TestCase
         $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
         $rows = $this->taskRowBlocks($blocks);
 
-        $this->assertSame(['1:mark_done', '1:edit_task', '1:move_down', '1:remind_me'], $this->optionValues($rows[0]));
+        $this->assertSame(['1:mark_done', '1:edit_task', '1:move_down'], $this->optionValues($rows[0]));
         $this->assertSame(
-            ['2:mark_done', '2:edit_task', '2:move_up', '2:move_down', '2:remind_me'],
+            ['2:mark_done', '2:edit_task', '2:move_up', '2:move_down'],
             $this->optionValues($rows[1])
         );
-        $this->assertSame(['3:mark_done', '3:edit_task', '3:move_up', '3:remind_me'], $this->optionValues($rows[2]));
+        $this->assertSame(['3:mark_done', '3:edit_task', '3:move_up'], $this->optionValues($rows[2]));
     }
 
     public function testDueDateBoundariesLandInTheCorrectCallout(): void
@@ -168,7 +168,7 @@ final class ListRendererTest extends TestCase
         $blocks = $this->renderer->render($tasks, $this->now, 3, 90);
         $rows = $this->taskRowBlocks($blocks);
 
-        $this->assertSame(['1:mark_done', '1:edit_task', '1:remind_me'], $this->optionValues($rows[0]));
+        $this->assertSame(['1:mark_done', '1:edit_task'], $this->optionValues($rows[0]));
     }
 
     public function testRowLabelShowsAssigneeMentionOrUnassignedAndFlagsOverdueInline(): void
