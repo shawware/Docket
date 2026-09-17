@@ -41,6 +41,8 @@ $timestamp = $_SERVER['HTTP_X_SLACK_REQUEST_TIMESTAMP'] ?? '';
 $signature = $_SERVER['HTTP_X_SLACK_SIGNATURE'] ?? '';
 $signingSecret = (string) envValue('SLACK_SIGNING_SECRET');
 
+$debugLogging = envValue('DEBUG_LOGGING') === '1';
+
 $slackApi = new SlackApi(new GuzzleHttp\Client(), (string) envValue('SLACK_BOT_TOKEN'));
 
 if (!$slackApi->verifySignature($signingSecret, $timestamp, $rawBody, $signature)) {
@@ -80,7 +82,24 @@ $router = new Router(
 );
 
 if ($path === '/slack/events') {
-    $challenge = $router->handleEvent(json_decode($rawBody, true) ?: []);
+    $eventPayload = json_decode($rawBody, true) ?: [];
+
+    if ($debugLogging) {
+        error_log(sprintf(
+            '[Docket] events payload type=%s event_type=%s tab=%s',
+            $eventPayload['type'] ?? 'n/a',
+            $eventPayload['event']['type'] ?? 'n/a',
+            $eventPayload['event']['tab'] ?? 'n/a'
+        ));
+    }
+
+    try {
+        $challenge = $router->handleEvent($eventPayload);
+    } catch (\Throwable $e) {
+        error_log('[Docket] handleEvent threw: ' . $e->getMessage());
+        http_response_code(200);
+        return;
+    }
 
     if ($challenge !== null) {
         header('Content-Type: text/plain');
@@ -94,6 +113,14 @@ if ($path === '/slack/interactions') {
     parse_str($rawBody, $formFields);
     $payload = json_decode((string) ($formFields['payload'] ?? '{}'), true);
     $payload = is_array($payload) ? $payload : [];
+
+    if ($debugLogging) {
+        error_log(sprintf(
+            '[Docket] interactions payload type=%s callback_id=%s',
+            $payload['type'] ?? 'n/a',
+            $payload['callback_id'] ?? ($payload['view']['callback_id'] ?? 'n/a')
+        ));
+    }
 
     if (($payload['type'] ?? null) === 'view_submission') {
         $result = $router->handleViewSubmission($payload);
@@ -111,6 +138,10 @@ if ($path === '/slack/interactions') {
     $router->handleBlockAction($payload);
     http_response_code(200);
     return;
+}
+
+if ($debugLogging) {
+    error_log("[Docket] commands payload body={$rawBody}");
 }
 
 parse_str($rawBody, $payload);
