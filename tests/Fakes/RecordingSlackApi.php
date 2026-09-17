@@ -23,6 +23,9 @@ final class RecordingSlackApi implements SlackApiInterface
 
     public bool $joinChannelFails = false;
 
+    /** @var array<int, array{triggerId: string, view: array<string, mixed>}> */
+    public array $openedViews = [];
+
     public function verifySignature(string $signingSecret, string $timestamp, string $rawBody, string $signatureHeader): bool
     {
         return true;
@@ -52,5 +55,11 @@ final class RecordingSlackApi implements SlackApiInterface
         if ($this->joinChannelFails) {
             throw new \RuntimeException('method_not_supported_for_channel_type');
         }
+    }
+
+    public function openView(string $triggerId, array $view): void
+    {
+        $this->calls[] = 'openView';
+        $this->openedViews[] = ['triggerId' => $triggerId, 'view' => $view];
     }
 }

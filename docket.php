@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Shawware\Docket;
 
+use Shawware\Docket\Modals\TaskModal;
 use Shawware\Docket\Storage\StorageInterface;
 
 /**
@@ -15,11 +16,12 @@ use Shawware\Docket\Storage\StorageInterface;
  */
 final class Router
 {
-    /** @var array<int, string> action_ids handled from the row overflow menu. */
+    /** @var array<int, string> task_menu actions that mutate storage directly, with no modal. */
     private const HANDLED_TASK_MENU_ACTIONS = ['mark_done', 'move_up', 'move_down', 'reopen'];
 
     public function __construct(
         private readonly StorageInterface $storage,
+        private readonly SlackApiInterface $slackApi,
         private readonly ChannelListService $channelListService,
         private readonly int $priorityGap
     ) {
@@ -42,14 +44,11 @@ final class Router
             return $this->textResponse('Usage: /docket <task title>');
         }
 
-        $openTasks = $this->storage->tasksForChannel($channelId, includeDone: false);
-        $maxPriority = $openTasks === [] ? 0 : max(array_column($openTasks, 'priority'));
-
         $this->storage->createTask(
             $channelId,
             $title,
             null,
-            $maxPriority + $this->priorityGap,
+            $this->nextPriority($channelId),
             false,
             null,
             $userId
@@ -61,16 +60,23 @@ final class Router
     }
 
     /**
-     * Handles a `block_actions` payload from the pinned list's row
-     * overflow menu: Done, Move up, Move down, or Reopen. Edit and
-     * Remind-me options also exist on the menu but aren't handled yet
-     * (Phase 5) — anything not in HANDLED_TASK_MENU_ACTIONS is ignored.
+     * Handles a `block_actions` payload: the "➕ Add task" button, or one
+     * of the pinned list's row overflow menu options (Done, Edit, Move
+     * up, Move down, Reopen — Remind me isn't handled yet).
      *
      * @param array<string, mixed> $payload
      */
     public function handleBlockAction(array $payload): void
     {
         $action = $payload['actions'][0] ?? [];
+        $channelId = (string) ($payload['channel']['id'] ?? '');
+        $triggerId = (string) ($payload['trigger_id'] ?? '');
+
+        if (($action['action_id'] ?? null) === 'add_task') {
+            $this->slackApi->openView($triggerId, TaskModal::build($channelId));
+
+            return;
+        }
 
         if (($action['action_id'] ?? null) !== 'task_menu') {
             return;
@@ -80,6 +86,16 @@ final class Router
         $parts = explode(':', $value, 2);
         $taskId = (int) ($parts[0] ?? 0);
         $taskAction = $parts[1] ?? '';
+
+        if ($taskAction === 'edit_task') {
+            $task = $this->storage->getTask($taskId);
+
+            if ($task !== null) {
+                $this->slackApi->openView($triggerId, TaskModal::build($channelId, $task));
+            }
+
+            return;
+        }
 
         if (!in_array($taskAction, self::HANDLED_TASK_MENU_ACTIONS, true)) {
             return;
@@ -92,8 +108,75 @@ final class Router
             'reopen' => $this->storage->reopenTask($taskId),
         };
 
-        $channelId = (string) ($payload['channel']['id'] ?? '');
         $this->channelListService->publish($channelId);
+    }
+
+    /**
+     * Handles the add/edit-task modal's `view_submission`. Add vs. edit
+     * is decided by whether `private_metadata` carries a task id — set
+     * by handleBlockAction() when it opened the modal.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{response_action: string, errors: array<string, string>}|null
+     *         An errors response to re-show the modal with a validation
+     *         message, or null to close it (the write already happened).
+     */
+    public function handleViewSubmission(array $payload): ?array
+    {
+        $view = $payload['view'] ?? [];
+
+        if (($view['callback_id'] ?? null) !== TaskModal::CALLBACK_ID) {
+            return null;
+        }
+
+        $metadata = json_decode((string) ($view['private_metadata'] ?? '{}'), true);
+        $channelId = (string) ($metadata['channelId'] ?? '');
+        $taskId = $metadata['taskId'] ?? null;
+
+        $values = $view['state']['values'] ?? [];
+        $title = trim((string) ($values['title_block']['title_input']['value'] ?? ''));
+
+        if ($title === '') {
+            return ['response_action' => 'errors', 'errors' => ['title_block' => 'Title is required.']];
+        }
+
+        $assigneeUserId = $values['assignee_block']['assignee_input']['selected_user'] ?? null;
+        $selectedDate = $values['due_date_block']['due_date_input']['selected_date'] ?? null;
+        $dueDate = $selectedDate !== null ? new \DateTimeImmutable($selectedDate) : null;
+        $important = ($values['important_block']['important_input']['selected_options'] ?? []) !== [];
+
+        if ($taskId === null) {
+            $userId = (string) ($payload['user']['id'] ?? '');
+            $this->storage->createTask(
+                $channelId,
+                $title,
+                $assigneeUserId,
+                $this->nextPriority($channelId),
+                $important,
+                $dueDate,
+                $userId
+            );
+        } else {
+            $this->storage->updateTaskDetails((int) $taskId, $title, $assigneeUserId, $dueDate, $important);
+        }
+
+        $this->channelListService->publish($channelId);
+
+        return null;
+    }
+
+    /**
+     * The priority for a new task added to the bottom of a channel's
+     * list: one gap past the current highest-ranked open task (or the
+     * first gap, if the channel has none). Done tasks never influence
+     * this — they've left the ranked list in every sense but storage.
+     */
+    private function nextPriority(string $channelId): int
+    {
+        $openTasks = $this->storage->tasksForChannel($channelId, includeDone: false);
+        $maxPriority = $openTasks === [] ? 0 : max(array_column($openTasks, 'priority'));
+
+        return $maxPriority + $this->priorityGap;
     }
 
     /** @return array{response_type: string, text: string} */

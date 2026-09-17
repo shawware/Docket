@@ -156,10 +156,159 @@ final class RouterTest extends TestCase
         [$router, $storage, $slackApi] = $this->makeRouter();
         $task = $storage->createTask('C1', 'Task', null, 1000, false, null, 'U1');
 
-        $router->handleBlockAction($this->blockActionPayload('C1', $task['id'] . ':edit_task'));
+        $router->handleBlockAction($this->blockActionPayload('C1', $task['id'] . ':remind_me'));
 
         $this->assertSame('open', $storage->getTask($task['id'])['status']);
         $this->assertSame([], $slackApi->calls);
+    }
+
+    public function testHandleBlockActionOpensABlankModalForAddTask(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleBlockAction([
+            'type' => 'block_actions',
+            'trigger_id' => 'trigger-1',
+            'channel' => ['id' => 'C1'],
+            'actions' => [['action_id' => 'add_task']],
+        ]);
+
+        $this->assertSame(['openView'], $slackApi->calls);
+        $this->assertSame('trigger-1', $slackApi->openedViews[0]['triggerId']);
+        $this->assertNull(json_decode($slackApi->openedViews[0]['view']['private_metadata'], true)['taskId']);
+    }
+
+    public function testHandleBlockActionOpensAPreFilledModalForEditTask(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Task', 'U9', 1000, true, null, 'U1');
+
+        $router->handleBlockAction(array_merge(
+            $this->blockActionPayload('C1', $task['id'] . ':edit_task'),
+            ['trigger_id' => 'trigger-2']
+        ));
+
+        $this->assertSame(['openView'], $slackApi->calls);
+        $view = $slackApi->openedViews[0]['view'];
+        $this->assertSame($task['id'], json_decode($view['private_metadata'], true)['taskId']);
+        $this->assertSame('Edit task', $view['title']['text']);
+    }
+
+    public function testHandleBlockActionEditTaskIgnoresAnUnknownTaskId(): void
+    {
+        [$router, , $slackApi] = $this->makeRouter();
+
+        $router->handleBlockAction($this->blockActionPayload('C1', '999999:edit_task'));
+
+        $this->assertSame([], $slackApi->calls);
+    }
+
+    public function testViewSubmissionWithNoTaskIdCreatesANewTaskAtTheBottom(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+        $storage->createTask('C1', 'Existing', null, 3000, false, null, 'U1');
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'New task']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+            'due_date_block' => ['due_date_input' => ['selected_date' => '2026-07-01']],
+            'important_block' => ['important_input' => ['selected_options' => [['value' => 'important']]]],
+        ]));
+
+        $this->assertNull($result);
+        $tasks = $storage->tasksForChannel('C1');
+        $this->assertCount(2, $tasks);
+        $this->assertSame('New task', $tasks[1]['title']);
+        $this->assertSame('U9', $tasks[1]['assigneeUserId']);
+        $this->assertSame('2026-07-01', $tasks[1]['dueDate']->format('Y-m-d'));
+        $this->assertTrue($tasks[1]['important']);
+        $this->assertSame(3000 + self::PRIORITY_GAP, $tasks[1]['priority']);
+    }
+
+    public function testViewSubmissionWithATaskIdUpdatesDetailsWithoutTouchingPriority(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+        $task = $storage->createTask('C1', 'Old title', null, 5000, false, null, 'U1');
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('C1', $task['id'], [
+            'title_block' => ['title_input' => ['value' => 'Updated title']],
+            'assignee_block' => ['assignee_input' => ['selected_user' => 'U9']],
+            'due_date_block' => ['due_date_input' => ['selected_date' => null]],
+            'important_block' => ['important_input' => ['selected_options' => []]],
+        ]));
+
+        $this->assertNull($result);
+        $updated = $storage->getTask($task['id']);
+        $this->assertSame('Updated title', $updated['title']);
+        $this->assertSame('U9', $updated['assigneeUserId']);
+        $this->assertFalse($updated['important']);
+        $this->assertSame(5000, $updated['priority']);
+    }
+
+    public function testViewSubmissionWithOptionalBlocksOmittedLeavesThemUnset(): void
+    {
+        // Slack omits an untouched optional block's key entirely, rather
+        // than sending it with an empty value.
+        [$router, $storage] = $this->makeRouter();
+
+        $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => 'Bare task']],
+        ]));
+
+        $tasks = $storage->tasksForChannel('C1');
+        $this->assertNull($tasks[0]['assigneeUserId']);
+        $this->assertNull($tasks[0]['dueDate']);
+        $this->assertFalse($tasks[0]['important']);
+    }
+
+    public function testViewSubmissionWithAnEmptyTitleReturnsErrorsAndWritesNothing(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('C1', null, [
+            'title_block' => ['title_input' => ['value' => '  ']],
+        ]));
+
+        $this->assertSame(['response_action' => 'errors', 'errors' => ['title_block' => 'Title is required.']], $result);
+        $this->assertSame([], $storage->tasksForChannel('C1'));
+    }
+
+    public function testViewSubmissionEditForAnUnknownTaskIdDoesNotFabricateARow(): void
+    {
+        [$router, $storage] = $this->makeRouter();
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('C1', 999999, [
+            'title_block' => ['title_input' => ['value' => 'Stale edit']],
+        ]));
+
+        $this->assertNull($result);
+        $this->assertNull($storage->getTask(999999));
+    }
+
+    public function testViewSubmissionForAnUnrelatedCallbackIdIsIgnored(): void
+    {
+        [$router] = $this->makeRouter();
+
+        $result = $router->handleViewSubmission(['view' => ['callback_id' => 'some_other_modal']]);
+
+        $this->assertNull($result);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function viewSubmissionPayload(string $channelId, ?int $taskId, array $values): array
+    {
+        return [
+            'type' => 'view_submission',
+            'user' => ['id' => 'U1'],
+            'view' => [
+                'callback_id' => 'task_modal',
+                'private_metadata' => json_encode(['channelId' => $channelId, 'taskId' => $taskId]),
+                'state' => ['values' => $values],
+            ],
+        ];
     }
 
     /**
@@ -184,7 +333,7 @@ final class RouterTest extends TestCase
         $storage = new InMemoryStorage();
         $slackApi = new RecordingSlackApi();
         $channelListService = new ChannelListService($storage, $slackApi, new ListRenderer(), 3);
-        $router = new Router($storage, $channelListService, self::PRIORITY_GAP);
+        $router = new Router($storage, $slackApi, $channelListService, self::PRIORITY_GAP);
 
         return [$router, $storage, $slackApi];
     }

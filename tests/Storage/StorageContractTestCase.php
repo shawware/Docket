@@ -139,6 +139,15 @@ abstract class StorageContractTestCase extends TestCase
         $this->assertSame(1000, $updated['priority'], 'editing must never change priority');
     }
 
+    public function testUpdateTaskDetailsIsANoOpForAnUnknownTaskId(): void
+    {
+        $storage = $this->createStorage();
+
+        $storage->updateTaskDetails(999999, 'New title', null, null, false);
+
+        $this->assertNull($storage->getTask(999999));
+    }
+
     public function testSwapPriorityExchangesRankWithTheAdjacentRowOnly(): void
     {
         $storage = $this->createStorage();

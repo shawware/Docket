@@ -108,6 +108,10 @@ final class InMemoryStorage implements StorageInterface
         ?\DateTimeImmutable $dueDate,
         bool $important
     ): void {
+        if (!isset($this->tasks[$taskId])) {
+            return;
+        }
+
         $this->tasks[$taskId]['title'] = $title;
         $this->tasks[$taskId]['assigneeUserId'] = $assigneeUserId;
         $this->tasks[$taskId]['dueDate'] = $dueDate;

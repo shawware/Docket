@@ -69,12 +69,21 @@ $config = require $root . '/config/task.php';
 $storage = new MySqlStorage($pdo);
 $listRenderer = new ListRenderer();
 $channelListService = new ChannelListService($storage, $slackApi, $listRenderer, $config['dueSoonWindowDays']);
-$router = new Router($storage, $channelListService, $config['priorityGap']);
+$router = new Router($storage, $slackApi, $channelListService, $config['priorityGap']);
 
 if ($path === '/slack/interactions') {
     parse_str($rawBody, $formFields);
     $payload = json_decode((string) ($formFields['payload'] ?? '{}'), true);
-    $router->handleBlockAction(is_array($payload) ? $payload : []);
+    $payload = is_array($payload) ? $payload : [];
+
+    if (($payload['type'] ?? null) === 'view_submission') {
+        $result = $router->handleViewSubmission($payload);
+        header('Content-Type: application/json');
+        echo json_encode($result ?? new stdClass());
+        return;
+    }
+
+    $router->handleBlockAction($payload);
     http_response_code(200);
     return;
 }

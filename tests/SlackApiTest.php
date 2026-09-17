@@ -141,6 +141,26 @@ final class SlackApiTest extends TestCase
         $this->assertSame(['channel' => 'C123'], json_decode((string) $request->getBody(), true));
     }
 
+    public function testOpenViewCallsViewsOpenWithTheRightPayload(): void
+    {
+        $history = [];
+        $slackApi = $this->makeSlackApiWithMockedHttp(
+            new Response(200, [], json_encode(['ok' => true])),
+            $history
+        );
+
+        $slackApi->openView('trigger-1', ['type' => 'modal']);
+
+        $this->assertCount(1, $history);
+        $request = $history[0]['request'];
+
+        $this->assertSame('https://slack.com/api/views.open', (string) $request->getUri());
+        $this->assertSame(
+            ['trigger_id' => 'trigger-1', 'view' => ['type' => 'modal']],
+            json_decode((string) $request->getBody(), true)
+        );
+    }
+
     public function testPostMessageThrowsWhenSlackReturnsOkFalse(): void
     {
         $history = [];

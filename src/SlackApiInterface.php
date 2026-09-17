@@ -44,4 +44,13 @@ interface SlackApiInterface
      * Not possible for private channels; those need a manual `/invite`.
      */
     public function joinChannel(string $channel): void;
+
+    /**
+     * Opens a modal in response to a block action — the `trigger_id`
+     * comes from that action's payload and expires after 3 seconds, so
+     * this must be called synchronously, not deferred.
+     *
+     * @param array<string, mixed> $view
+     */
+    public function openView(string $triggerId, array $view): void;
 }

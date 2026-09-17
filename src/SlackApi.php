@@ -81,6 +81,14 @@ final class SlackApi implements SlackApiInterface
         $this->call('conversations.join', ['channel' => $channel]);
     }
 
+    public function openView(string $triggerId, array $view): void
+    {
+        $this->call('views.open', [
+            'trigger_id' => $triggerId,
+            'view' => $view,
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $json
      * @return array<string, mixed>
