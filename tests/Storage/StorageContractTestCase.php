@@ -266,6 +266,27 @@ abstract class StorageContractTestCase extends TestCase
         $this->assertNotContains('C2', $channels);
     }
 
+    public function testChannelsWithTasksIncludesChannelsWithOnlyDoneTasks(): void
+    {
+        $storage = $this->createStorage();
+
+        $done = $storage->createTask('C1', 'Will be done', null, 1000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $this->assertContains('C1', $storage->channelsWithTasks());
+    }
+
+    public function testChannelsWithTasksListsEachChannelOnce(): void
+    {
+        $storage = $this->createStorage();
+
+        $storage->createTask('C1', 'First', null, 1000, false, null, 'U1');
+        $storage->createTask('C1', 'Second', null, 2000, false, null, 'U1');
+
+        $channels = array_filter($storage->channelsWithTasks(), static fn (string $id): bool => $id === 'C1');
+        $this->assertCount(1, $channels);
+    }
+
     public function testAssigneesWithOpenTasksListsOnlyUsersWithAnOpenTask(): void
     {
         $storage = $this->createStorage();

@@ -151,11 +151,22 @@ interface StorageInterface
 
     /**
      * Channel ids with at least one open task — for the weekly digest's
-     * per-channel unassigned summary and the pinned-list sweep.
+     * per-channel unassigned summary.
      *
      * @return array<int, string>
      */
     public function channelsWithOpenTasks(): array;
+
+    /**
+     * Channel ids with at least one task, open or done — for the weekly
+     * digest's sweep-and-republish step. Broader than
+     * channelsWithOpenTasks() on purpose: a channel whose last open task
+     * was *just* marked done still needs its done rows swept and its
+     * pinned list republished, even though it has no open task left.
+     *
+     * @return array<int, string>
+     */
+    public function channelsWithTasks(): array;
 
     /**
      * User ids with at least one open task, across every channel — for

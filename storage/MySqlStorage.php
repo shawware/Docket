@@ -163,6 +163,13 @@ final class MySqlStorage implements StorageInterface
             ->fetchAll(\PDO::FETCH_COLUMN);
     }
 
+    public function channelsWithTasks(): array
+    {
+        return $this->pdo
+            ->query('SELECT DISTINCT channel_id FROM tasks')
+            ->fetchAll(\PDO::FETCH_COLUMN);
+    }
+
     public function assigneesWithOpenTasks(): array
     {
         return $this->pdo

@@ -165,6 +165,14 @@ final class InMemoryStorage implements StorageInterface
         return array_values($channels);
     }
 
+    public function channelsWithTasks(): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (array $task): string => $task['channelId'],
+            $this->tasks
+        )));
+    }
+
     public function assigneesWithOpenTasks(): array
     {
         $assignees = array_unique(array_filter(array_map(
