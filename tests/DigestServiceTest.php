@@ -224,6 +224,66 @@ final class DigestServiceTest extends TestCase
         $this->assertSame([], $summaryPosts);
     }
 
+    public function testChannelSummaryLeadsWithHowManyTasksWereCompleted(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Still open', 'U_ME', 1000, false, null, 'U1');
+        $done = $storage->createTask('C1', 'Just finished', 'U_ME', 2000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $digest->run();
+
+        $text = json_encode($this->channelSummaryBlocksFor($slackApi, 'C1'));
+        // "lead with" — the completed line must come before the open-count line.
+        $this->assertMatchesRegularExpression(
+            '/1 task completed since the last check.*There are 1 open task/s',
+            $text
+        );
+    }
+
+    public function testChannelSummaryUsesSingularWordingForOneCompletedTask(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $done = $storage->createTask('C1', 'Just finished', 'U_ME', 1000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $digest->run();
+
+        $text = json_encode($this->channelSummaryBlocksFor($slackApi, 'C1'));
+        $this->assertStringContainsString('1 task completed since the last check', $text);
+        $this->assertStringNotContainsString('1 tasks completed', $text);
+    }
+
+    public function testChannelSummaryOmitsTheCompletedLineWhenNothingWasCompleted(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Needs an owner', null, 1000, false, null, 'U1');
+
+        $digest->run();
+
+        $text = json_encode($this->channelSummaryBlocksFor($slackApi, 'C1'));
+        $this->assertStringNotContainsString('completed', $text);
+    }
+
+    public function testChannelSummaryStillPostsForACompletionEvenWithZeroOpenTasksLeft(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $done = $storage->createTask('C1', 'The only task, now done', 'U_ME', 1000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        // C1 has zero open tasks, so it's absent from channelsWithOpenTasks()
+        // — but a completion still needs to be announced.
+        $digest->run();
+
+        $text = json_encode($this->channelSummaryBlocksFor($slackApi, 'C1'));
+        $this->assertStringContainsString('1 task completed since the last check', $text);
+        $this->assertStringContainsString('There are 0 open tasks in this channel.', $text);
+    }
+
     public function testSweepsDoneTasksAndRepublishesEveryChannelWithTasks(): void
     {
         [$digest, $storage, $slackApi] = $this->makeDigestService();
@@ -320,6 +380,20 @@ final class DigestServiceTest extends TestCase
         }
 
         $this->fail("No message was posted to {$channel}");
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function channelSummaryBlocksFor(RecordingSlackApi $slackApi, string $channel): array
+    {
+        foreach ($slackApi->postedMessages as $message) {
+            if ($message['channel'] === $channel && $message['fallbackText'] === 'Channel task summary') {
+                return $message['blocks'];
+            }
+        }
+
+        $this->fail("No channel summary was posted to {$channel}");
     }
 
     /**

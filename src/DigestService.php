@@ -137,9 +137,12 @@ final class DigestService
 
     /**
      * Posts a channel-level heads-up when there's something worth a nudge:
-     * an open task with no owner, or an open task that's overdue
-     * (regardless of who it's assigned to — everyone in the channel
-     * benefits from knowing). Silent otherwise, same as before.
+     * a task completed since the last check, an open task with no owner,
+     * or an open task that's overdue (regardless of who it's assigned to
+     * — everyone in the channel benefits from knowing). Silent otherwise.
+     * Scoped to channelsWithTasks(), not channelsWithOpenTasks(), so a
+     * channel whose only task was just completed still gets its "N
+     * completed" heads-up even though it now has zero open tasks.
      *
      * @return array<int, string>
      */
@@ -147,18 +150,21 @@ final class DigestService
     {
         $report = [];
 
-        foreach ($this->storage->channelsWithOpenTasks() as $channelId) {
-            $openTasks = $this->storage->tasksForChannel($channelId, includeDone: false);
-            $unassigned = $this->storage->unassignedTasksForChannel($channelId);
+        foreach ($this->storage->channelsWithTasks() as $channelId) {
+            $allTasks = $this->storage->tasksForChannel($channelId);
+            $openTasks = array_values(array_filter($allTasks, static fn (array $task): bool => $task['status'] === 'open'));
+            $doneCount = count($allTasks) - count($openTasks);
+            $unassigned = array_values(array_filter($openTasks, static fn (array $task): bool => $task['assigneeUserId'] === null));
             $overdue = $this->listRenderer->overdueTasks($openTasks, new \DateTimeImmutable());
 
-            if ($unassigned === [] && $overdue === []) {
+            if ($unassigned === [] && $overdue === [] && $doneCount === 0) {
                 continue;
             }
 
             $report[] = sprintf(
-                'Post to %s: %d open task(s) total, %d unassigned, %d overdue',
+                'Post to %s: %d completed, %d open task(s) total, %d unassigned, %d overdue',
                 $channelId,
+                $doneCount,
                 count($openTasks),
                 count($unassigned),
                 count($overdue)
@@ -168,7 +174,17 @@ final class DigestService
                 continue;
             }
 
-            $text = sprintf(
+            $text = '';
+
+            if ($doneCount > 0) {
+                $text .= sprintf(
+                    '✅ %d task%s completed since the last check.',
+                    $doneCount,
+                    $doneCount === 1 ? '' : 's'
+                ) . "\n\n";
+            }
+
+            $text .= sprintf(
                 'There are %d open task%s in this channel.',
                 count($openTasks),
                 count($openTasks) === 1 ? '' : 's'
