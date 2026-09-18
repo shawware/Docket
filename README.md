@@ -14,3 +14,7 @@ See [CLAUDE.md](CLAUDE.md) for the full specification.
 ## License
 
 GPLv3 — see [LICENSE.txt](LICENSE.txt).
+
+## Copyright
+
+© 2026 [shawware.com.au](https://www.shawware.com.au "Software and services you can count on")
