@@ -46,6 +46,10 @@ final class Router
             return $this->textResponse('Usage: /docket <task title>');
         }
 
+        if (!self::looksLikeAChannelId($channelId)) {
+            return $this->textResponse('Docket only works in a channel — try this again there.');
+        }
+
         $this->storage->createTask(
             $channelId,
             $title,
@@ -257,6 +261,10 @@ final class Router
         $previousAssigneeUserId = null;
 
         if ($taskId === null) {
+            if (!self::looksLikeAChannelId($channelId)) {
+                return ['response_action' => 'errors', 'errors' => ['title_block' => 'Something went wrong — please reopen this from a channel.']];
+            }
+
             $this->storage->createTask(
                 $channelId,
                 $title,
@@ -323,5 +331,19 @@ final class Router
     private function textResponse(string $text): array
     {
         return ['response_type' => 'ephemeral', 'text' => $text];
+    }
+
+    /**
+     * A cheap sanity check on `channelId` before it's used to create a
+     * task: Slack channel/group/DM ids always start with C, G, or D —
+     * never U (a user id) or W (some bot/enterprise ids). This isn't a
+     * security boundary (a forged-but-signed request could still lie),
+     * just a guard against a malformed payload silently creating a task
+     * whose "channel" is actually someone's user id — which
+     * ChannelListService would then happily try to join/pin/publish to.
+     */
+    private static function looksLikeAChannelId(string $channelId): bool
+    {
+        return (bool) preg_match('/^[CGD][A-Z0-9]+$/', $channelId);
     }
 }

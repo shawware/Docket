@@ -87,6 +87,24 @@ final class RouterTest extends TestCase
         $this->assertSame(2000 + self::PRIORITY_GAP, $newTask['priority']);
     }
 
+    public function testSlashCommandRejectsAChannelIdThatLooksLikeAUserId(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+
+        // Regression: a malformed test payload once set channel_id to a
+        // real Slack user id, silently creating a task whose "channel"
+        // was actually someone's DM — see docket.php's looksLikeAChannelId().
+        $response = $router->handleSlashCommand([
+            'channel_id' => 'U06AGNZP4UB',
+            'user_id' => 'U1',
+            'text' => 'New task',
+        ]);
+
+        $this->assertSame([], $storage->tasksForChannel('U06AGNZP4UB'));
+        $this->assertSame([], $slackApi->calls);
+        $this->assertStringContainsString('channel', $response['text']);
+    }
+
     public function testHandleBlockActionMarksTheTaskDoneAndPublishes(): void
     {
         [$router, $storage, $slackApi] = $this->makeRouter();
@@ -280,6 +298,19 @@ final class RouterTest extends TestCase
         $this->assertSame('2026-07-01', $tasks[1]['dueDate']->format('Y-m-d'));
         $this->assertTrue($tasks[1]['important']);
         $this->assertSame(3000 + self::PRIORITY_GAP, $tasks[1]['priority']);
+    }
+
+    public function testViewSubmissionCreateRejectsAChannelIdThatLooksLikeAUserId(): void
+    {
+        [$router, $storage, $slackApi] = $this->makeRouter();
+
+        $result = $router->handleViewSubmission($this->viewSubmissionPayload('U06AGNZP4UB', null, [
+            'title_block' => ['title_input' => ['value' => 'New task']],
+        ]));
+
+        $this->assertSame(['response_action', 'errors'], array_keys($result));
+        $this->assertSame([], $storage->tasksForChannel('U06AGNZP4UB'));
+        $this->assertSame([], $slackApi->calls);
     }
 
     public function testViewSubmissionWithATaskIdUpdatesDetailsWithoutTouchingPriority(): void
