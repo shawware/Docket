@@ -11,9 +11,7 @@ namespace Shawware\Docket\Storage;
  */
 final class MySqlStorage implements StorageInterface
 {
-    public function __construct(private readonly \PDO $pdo)
-    {
-    }
+    public function __construct(private readonly \PDO $pdo) {}
 
     public function createTask(
         string $channelId,

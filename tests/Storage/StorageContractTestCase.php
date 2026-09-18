@@ -82,7 +82,7 @@ abstract class StorageContractTestCase extends TestCase
         $storage->createTask('C2', 'Other channel', null, 1000, false, null, 'U1');
 
         $titles = array_map(
-            static fn (array $task): string => $task['title'],
+            static fn(array $task): string => $task['title'],
             $storage->tasksForChannel('C1')
         );
 
@@ -114,7 +114,7 @@ abstract class StorageContractTestCase extends TestCase
         $storage->createTask('C1', 'Not mine', 'U_OTHER', 1000, false, null, 'U1');
 
         $titles = array_map(
-            static fn (array $task): string => $task['title'],
+            static fn(array $task): string => $task['title'],
             $storage->tasksForAssignee('U_ME')
         );
 
@@ -186,7 +186,7 @@ abstract class StorageContractTestCase extends TestCase
         $storage->swapPriority($second['id'], 'up');
 
         $ordered = array_map(
-            static fn (array $task): string => $task['title'],
+            static fn(array $task): string => $task['title'],
             $storage->tasksForChannel('C1')
         );
 
@@ -207,7 +207,7 @@ abstract class StorageContractTestCase extends TestCase
         $storage->swapPriority($second['id'], 'down');
 
         $ordered = array_map(
-            static fn (array $task): string => $task['title'],
+            static fn(array $task): string => $task['title'],
             $storage->tasksForChannel('C1')
         );
 
@@ -283,7 +283,7 @@ abstract class StorageContractTestCase extends TestCase
         $storage->createTask('C1', 'First', null, 1000, false, null, 'U1');
         $storage->createTask('C1', 'Second', null, 2000, false, null, 'U1');
 
-        $channels = array_filter($storage->channelsWithTasks(), static fn (string $id): bool => $id === 'C1');
+        $channels = array_filter($storage->channelsWithTasks(), static fn(string $id): bool => $id === 'C1');
         $this->assertCount(1, $channels);
     }
 
@@ -312,7 +312,7 @@ abstract class StorageContractTestCase extends TestCase
 
         $assignees = $storage->assigneesWithOpenTasks();
 
-        $this->assertSame(1, count(array_filter($assignees, static fn (string $id): bool => $id === 'U_ME')));
+        $this->assertSame(1, count(array_filter($assignees, static fn(string $id): bool => $id === 'U_ME')));
     }
 
     public function testUnassignedTasksForChannelExcludesAssignedRows(): void
@@ -323,7 +323,7 @@ abstract class StorageContractTestCase extends TestCase
         $storage->createTask('C1', 'Assigned', 'U_SOMEONE', 2000, false, null, 'U1');
 
         $titles = array_map(
-            static fn (array $task): string => $task['title'],
+            static fn(array $task): string => $task['title'],
             $storage->unassignedTasksForChannel('C1')
         );
 

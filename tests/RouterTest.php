@@ -11,8 +11,8 @@ use Shawware\Docket\AssignmentNotifier;
 use Shawware\Docket\ChannelListService;
 use Shawware\Docket\ListRenderer;
 use Shawware\Docket\Router;
-use Shawware\Docket\Tests\Fakes\RecordingSlackApi;
 use Shawware\Docket\Storage\InMemoryStorage;
+use Shawware\Docket\Tests\Fakes\RecordingSlackApi;
 
 require_once __DIR__ . '/../docket.php';
 
@@ -126,7 +126,7 @@ final class RouterTest extends TestCase
 
         $router->handleBlockAction($this->blockActionPayload('C1', $second['id'] . ':move_up'));
 
-        $ordered = array_map(static fn (array $t): string => $t['title'], $storage->tasksForChannel('C1'));
+        $ordered = array_map(static fn(array $t): string => $t['title'], $storage->tasksForChannel('C1'));
         $this->assertSame(['Second', 'First'], $ordered);
     }
 
@@ -190,7 +190,7 @@ final class RouterTest extends TestCase
 
         $router->handleBlockAction($this->blockActionPayload('C1', $first['id'] . ':move_down'));
 
-        $ordered = array_map(static fn (array $t): string => $t['title'], $storage->tasksForChannel('C1'));
+        $ordered = array_map(static fn(array $t): string => $t['title'], $storage->tasksForChannel('C1'));
         $this->assertSame(['Second', 'First'], $ordered);
     }
 

@@ -26,8 +26,7 @@ final class Router
         private readonly AssignmentNotifier $assignmentNotifier,
         private readonly ListRenderer $listRenderer,
         private readonly int $priorityGap
-    ) {
-    }
+    ) {}
 
     /**
      * Handles `/docket <title>` — the simplest add path, appending to the

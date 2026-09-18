@@ -16,9 +16,7 @@ namespace Shawware\Docket;
  */
 final class RequestDispatcher
 {
-    public function __construct(private readonly Router $router)
-    {
-    }
+    public function __construct(private readonly Router $router) {}
 
     /**
      * @param array<string, mixed> $payload

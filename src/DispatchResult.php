@@ -19,6 +19,5 @@ final class DispatchResult
         public readonly int $status,
         public readonly string $body = '',
         public readonly ?string $contentType = null
-    ) {
-    }
+    ) {}
 }

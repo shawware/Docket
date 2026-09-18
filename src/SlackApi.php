@@ -23,8 +23,7 @@ final class SlackApi implements SlackApiInterface
     public function __construct(
         private readonly ClientInterface $httpClient,
         private readonly string $botToken
-    ) {
-    }
+    ) {}
 
     /**
      * Verifies that a request actually came from Slack: the signature

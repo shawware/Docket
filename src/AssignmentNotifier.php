@@ -14,9 +14,7 @@ namespace Shawware\Docket;
  */
 final class AssignmentNotifier
 {
-    public function __construct(private readonly SlackApiInterface $slackApi)
-    {
-    }
+    public function __construct(private readonly SlackApiInterface $slackApi) {}
 
     /**
      * @param string|null $listMessageTs the channel's pinned list message

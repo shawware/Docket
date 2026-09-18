@@ -341,7 +341,7 @@ final class ListRendererTest extends TestCase
         // carry the single reopen option — this distinguishes the two.
         return array_values(array_filter(
             $blocks,
-            static fn (array $block): bool => $block['type'] === 'section'
+            static fn(array $block): bool => $block['type'] === 'section'
                 && isset($block['accessory'])
                 && str_ends_with((string) $block['accessory']['options'][0]['value'], ':mark_done')
         ));
@@ -354,7 +354,7 @@ final class ListRendererTest extends TestCase
     private function optionValues(array $row): array
     {
         return array_map(
-            static fn (array $option): string => $option['value'],
+            static fn(array $option): string => $option['value'],
             $row['accessory']['options']
         );
     }

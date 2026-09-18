@@ -48,8 +48,8 @@ final class ListRenderer
     public function render(array $tasks, \DateTimeImmutable $now, int $dueSoonWindowDays, int $sourceLinkMaxAgeDays): array
     {
         $today = new \DateTimeImmutable($now->format('Y-m-d'));
-        $openTasks = array_values(array_filter($tasks, static fn (array $task): bool => $task['status'] === 'open'));
-        $doneTasks = array_values(array_filter($tasks, static fn (array $task): bool => $task['status'] !== 'open'));
+        $openTasks = array_values(array_filter($tasks, static fn(array $task): bool => $task['status'] === 'open'));
+        $doneTasks = array_values(array_filter($tasks, static fn(array $task): bool => $task['status'] !== 'open'));
 
         $blocks = [];
 
@@ -148,7 +148,7 @@ final class ListRenderer
             ];
 
             $lines = array_map(
-                fn (array $task): string => '• ' . $this->rowLabel($task, $today),
+                fn(array $task): string => '• ' . $this->rowLabel($task, $today),
                 $channelTasks
             );
             $blocks[] = [
@@ -175,10 +175,10 @@ final class ListRenderer
 
         $overdue = array_values(array_filter(
             $tasks,
-            static fn (array $task): bool => $task['dueDate'] !== null && $task['dueDate'] < $today
+            static fn(array $task): bool => $task['dueDate'] !== null && $task['dueDate'] < $today
         ));
 
-        usort($overdue, static fn (array $a, array $b): int => $b['dueDate'] <=> $a['dueDate']);
+        usort($overdue, static fn(array $a, array $b): int => $b['dueDate'] <=> $a['dueDate']);
 
         return $overdue;
     }
@@ -193,12 +193,12 @@ final class ListRenderer
 
         $dueSoon = array_values(array_filter(
             $tasks,
-            static fn (array $task): bool => $task['dueDate'] !== null
+            static fn(array $task): bool => $task['dueDate'] !== null
                 && $task['dueDate'] >= $today
                 && $task['dueDate'] <= $windowEnd
         ));
 
-        usort($dueSoon, static fn (array $a, array $b): int => $a['dueDate'] <=> $b['dueDate']);
+        usort($dueSoon, static fn(array $a, array $b): int => $a['dueDate'] <=> $b['dueDate']);
 
         return $dueSoon;
     }
@@ -214,7 +214,7 @@ final class ListRenderer
         }
 
         $lines = array_map(
-            fn (array $task): string => '• ' . $task['title'] . ' — ' . $task['dueDate']->format('Y-m-d'),
+            fn(array $task): string => '• ' . $task['title'] . ' — ' . $task['dueDate']->format('Y-m-d'),
             $tasks
         );
 
@@ -246,7 +246,7 @@ final class ListRenderer
         }
 
         $options = array_map(
-            static fn (string $action): array => [
+            static fn(string $action): array => [
                 'text' => ['type' => 'plain_text', 'text' => self::ACTION_LABELS[$action], 'emoji' => true],
                 'value' => $task['id'] . ':' . $action,
             ],

@@ -9,8 +9,8 @@ namespace Shawware\Docket\Tests;
 use PHPUnit\Framework\TestCase;
 use Shawware\Docket\ChannelListService;
 use Shawware\Docket\ListRenderer;
-use Shawware\Docket\Tests\Fakes\RecordingSlackApi;
 use Shawware\Docket\Storage\InMemoryStorage;
+use Shawware\Docket\Tests\Fakes\RecordingSlackApi;
 
 final class ChannelListServiceTest extends TestCase
 {

@@ -30,8 +30,7 @@ final class DigestService
         private readonly SlackApiInterface $slackApi,
         private readonly ChannelListService $channelListService,
         private readonly ListRenderer $listRenderer
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<int, string>
@@ -57,7 +56,7 @@ final class DigestService
             $tasks = $this->storage->tasksForAssignee($userId);
             $completedCount = $completedCounts[$userId] ?? 0;
             $channels = array_values(array_unique(array_map(
-                static fn (array $task): string => $task['channelId'],
+                static fn(array $task): string => $task['channelId'],
                 $tasks
             )));
 
@@ -152,9 +151,9 @@ final class DigestService
 
         foreach ($this->storage->channelsWithTasks() as $channelId) {
             $allTasks = $this->storage->tasksForChannel($channelId);
-            $openTasks = array_values(array_filter($allTasks, static fn (array $task): bool => $task['status'] === 'open'));
+            $openTasks = array_values(array_filter($allTasks, static fn(array $task): bool => $task['status'] === 'open'));
             $doneCount = count($allTasks) - count($openTasks);
-            $unassigned = array_values(array_filter($openTasks, static fn (array $task): bool => $task['assigneeUserId'] === null));
+            $unassigned = array_values(array_filter($openTasks, static fn(array $task): bool => $task['assigneeUserId'] === null));
             $overdue = $this->listRenderer->overdueTasks($openTasks, new \DateTimeImmutable());
 
             if ($unassigned === [] && $overdue === [] && $doneCount === 0) {
@@ -192,14 +191,14 @@ final class DigestService
 
             if ($overdue !== []) {
                 $lines = array_map(
-                    static fn (array $task): string => '• ' . $task['title'] . ' — ' . $task['dueDate']->format('Y-m-d'),
+                    static fn(array $task): string => '• ' . $task['title'] . ' — ' . $task['dueDate']->format('Y-m-d'),
                     $overdue
                 );
                 $text .= "\n\n*⚠️ Overdue (" . count($overdue) . "):*\n" . implode("\n", $lines);
             }
 
             if ($unassigned !== []) {
-                $lines = array_map(static fn (array $task): string => '• ' . $task['title'], $unassigned);
+                $lines = array_map(static fn(array $task): string => '• ' . $task['title'], $unassigned);
                 $text .= "\n\n*Unassigned (" . count($unassigned) . "):*\n" . implode("\n", $lines);
             }
 
@@ -219,7 +218,7 @@ final class DigestService
         foreach ($this->storage->channelsWithTasks() as $channelId) {
             $doneCount = count(array_filter(
                 $this->storage->tasksForChannel($channelId),
-                static fn (array $task): bool => $task['status'] === 'done'
+                static fn(array $task): bool => $task['status'] === 'done'
             ));
 
             $report[] = sprintf('Sweep %s: %d done task(s), then republish', $channelId, $doneCount);

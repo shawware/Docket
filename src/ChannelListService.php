@@ -23,8 +23,7 @@ final class ChannelListService
         private readonly ListRenderer $listRenderer,
         private readonly int $dueSoonWindowDays,
         private readonly int $sourceLinkMaxAgeDays
-    ) {
-    }
+    ) {}
 
     /**
      * Renders the channel's current tasks and pushes them to Slack: an

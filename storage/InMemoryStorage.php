@@ -77,14 +77,14 @@ final class InMemoryStorage implements StorageInterface
     {
         $inChannel = array_values(array_filter(
             $this->tasks,
-            static fn (array $task): bool => $task['channelId'] === $channelId
+            static fn(array $task): bool => $task['channelId'] === $channelId
                 && ($includeDone || $task['status'] === 'open')
         ));
 
-        $open = array_values(array_filter($inChannel, static fn (array $task): bool => $task['status'] === 'open'));
-        $done = array_values(array_filter($inChannel, static fn (array $task): bool => $task['status'] === 'done'));
+        $open = array_values(array_filter($inChannel, static fn(array $task): bool => $task['status'] === 'open'));
+        $done = array_values(array_filter($inChannel, static fn(array $task): bool => $task['status'] === 'done'));
 
-        usort($open, static fn (array $a, array $b): int => $a['priority'] <=> $b['priority']);
+        usort($open, static fn(array $a, array $b): int => $a['priority'] <=> $b['priority']);
 
         return [...$open, ...$done];
     }
@@ -93,10 +93,10 @@ final class InMemoryStorage implements StorageInterface
     {
         $mine = array_values(array_filter(
             $this->tasks,
-            static fn (array $task): bool => $task['assigneeUserId'] === $userId && $task['status'] === 'open'
+            static fn(array $task): bool => $task['assigneeUserId'] === $userId && $task['status'] === 'open'
         ));
 
-        usort($mine, static fn (array $a, array $b): int => $a['priority'] <=> $b['priority']);
+        usort($mine, static fn(array $a, array $b): int => $a['priority'] <=> $b['priority']);
 
         return $mine;
     }
@@ -130,7 +130,7 @@ final class InMemoryStorage implements StorageInterface
 
         $siblings = $this->tasksForChannel($task['channelId'], includeDone: false);
 
-        $index = array_search($taskId, array_map(static fn (array $t): int => $t['id'], $siblings), true);
+        $index = array_search($taskId, array_map(static fn(array $t): int => $t['id'], $siblings), true);
         $neighbourIndex = $direction === 'up' ? $index - 1 : $index + 1;
 
         if ($neighbourIndex < 0 || $neighbourIndex >= count($siblings)) {
@@ -158,8 +158,8 @@ final class InMemoryStorage implements StorageInterface
     public function channelsWithOpenTasks(): array
     {
         $channels = array_unique(array_map(
-            static fn (array $task): string => $task['channelId'],
-            array_filter($this->tasks, static fn (array $task): bool => $task['status'] === 'open')
+            static fn(array $task): string => $task['channelId'],
+            array_filter($this->tasks, static fn(array $task): bool => $task['status'] === 'open')
         ));
 
         return array_values($channels);
@@ -168,7 +168,7 @@ final class InMemoryStorage implements StorageInterface
     public function channelsWithTasks(): array
     {
         return array_values(array_unique(array_map(
-            static fn (array $task): string => $task['channelId'],
+            static fn(array $task): string => $task['channelId'],
             $this->tasks
         )));
     }
@@ -176,8 +176,8 @@ final class InMemoryStorage implements StorageInterface
     public function assigneesWithOpenTasks(): array
     {
         $assignees = array_unique(array_filter(array_map(
-            static fn (array $task): ?string => $task['assigneeUserId'],
-            array_filter($this->tasks, static fn (array $task): bool => $task['status'] === 'open')
+            static fn(array $task): ?string => $task['assigneeUserId'],
+            array_filter($this->tasks, static fn(array $task): bool => $task['status'] === 'open')
         )));
 
         return array_values($assignees);
@@ -187,12 +187,12 @@ final class InMemoryStorage implements StorageInterface
     {
         $unassigned = array_values(array_filter(
             $this->tasks,
-            static fn (array $task): bool => $task['channelId'] === $channelId
+            static fn(array $task): bool => $task['channelId'] === $channelId
                 && $task['status'] === 'open'
                 && $task['assigneeUserId'] === null
         ));
 
-        usort($unassigned, static fn (array $a, array $b): int => $a['priority'] <=> $b['priority']);
+        usort($unassigned, static fn(array $a, array $b): int => $a['priority'] <=> $b['priority']);
 
         return $unassigned;
     }
@@ -201,7 +201,7 @@ final class InMemoryStorage implements StorageInterface
     {
         $this->tasks = array_filter(
             $this->tasks,
-            static fn (array $task): bool => !($task['channelId'] === $channelId && $task['status'] === 'done')
+            static fn(array $task): bool => !($task['channelId'] === $channelId && $task['status'] === 'done')
         );
     }
 

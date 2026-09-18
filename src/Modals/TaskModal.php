@@ -51,7 +51,7 @@ final class TaskModal
                         'type' => 'plain_text_input',
                         'action_id' => 'title_input',
                         'initial_value' => $prefill['title'] ?? null,
-                    ], static fn (mixed $value): bool => $value !== null),
+                    ], static fn(mixed $value): bool => $value !== null),
                 ],
                 [
                     'type' => 'input',
@@ -62,7 +62,7 @@ final class TaskModal
                         'type' => 'users_select',
                         'action_id' => 'assignee_input',
                         'initial_user' => $prefill['assigneeUserId'] ?? null,
-                    ], static fn (mixed $value): bool => $value !== null),
+                    ], static fn(mixed $value): bool => $value !== null),
                 ],
                 [
                     'type' => 'input',
@@ -73,7 +73,7 @@ final class TaskModal
                         'type' => 'datepicker',
                         'action_id' => 'due_date_input',
                         'initial_date' => ($prefill['dueDate'] ?? null)?->format('Y-m-d'),
-                    ], static fn (mixed $value): bool => $value !== null),
+                    ], static fn(mixed $value): bool => $value !== null),
                 ],
                 [
                     'type' => 'input',
@@ -85,7 +85,7 @@ final class TaskModal
                         'action_id' => 'important_input',
                         'options' => [self::IMPORTANT_OPTION],
                         'initial_options' => ($prefill['important'] ?? false) ? [self::IMPORTANT_OPTION] : null,
-                    ], static fn (mixed $value): bool => $value !== null),
+                    ], static fn(mixed $value): bool => $value !== null),
                 ],
                 [
                     'type' => 'input',
@@ -97,7 +97,7 @@ final class TaskModal
                         'action_id' => 'link_input',
                         'placeholder' => ['type' => 'plain_text', 'text' => 'Paste a Slack link to a message (optional)'],
                         'initial_value' => $prefill['sourcePermalink'] ?? null,
-                    ], static fn (mixed $value): bool => $value !== null),
+                    ], static fn(mixed $value): bool => $value !== null),
                 ],
             ],
         ];

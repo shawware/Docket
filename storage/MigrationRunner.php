@@ -16,8 +16,7 @@ final class MigrationRunner
     public function __construct(
         private readonly \PDO $pdo,
         private readonly string $migrationsDir
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<int, string> filenames of the migrations applied by
