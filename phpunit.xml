@@ -15,4 +15,13 @@
             <file>docket.php</file>
         </include>
     </source>
+    <php>
+        <!-- Several tests deliberately trigger RequestDispatcher's
+             error_log() calls to prove exceptions are caught and logged.
+             Without this, CLI PHP's default error_log destination is
+             stderr, which interleaves those lines with PHPUnit's own
+             progress output. The assertions already cover the behavior;
+             nothing needs to read this log during a test run. -->
+        <ini name="error_log" value="/dev/null"/>
+    </php>
 </phpunit>
