@@ -281,7 +281,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 2, title: 'Later in C1', priority: 2000, channelId: 'C1'),
         ];
 
-        $blocks = $this->renderer->renderMyTasks($tasks);
+        $blocks = $this->renderer->renderMyTasks($tasks, $this->now);
 
         $listText = $blocks[1]['text']['text'];
         $this->assertLessThan(
@@ -298,7 +298,7 @@ final class ListRendererTest extends TestCase
             $this->task(id: 3, title: 'Task C', priority: 2000, channelId: 'C1'),
         ];
 
-        $blocks = $this->renderer->renderMyTasks($tasks);
+        $blocks = $this->renderer->renderMyTasks($tasks, $this->now);
 
         $this->assertStringContainsString('C1', $blocks[0]['text']['text']);
         $this->assertStringContainsString('Task A', $blocks[1]['text']['text']);
@@ -309,10 +309,27 @@ final class ListRendererTest extends TestCase
 
     public function testRenderMyTasksWithNoTasksShowsAnEmptyState(): void
     {
-        $blocks = $this->renderer->renderMyTasks([]);
+        $blocks = $this->renderer->renderMyTasks([], $this->now);
 
         $this->assertCount(1, $blocks);
         $this->assertStringContainsString('No open tasks', $blocks[0]['text']['text']);
+    }
+
+    public function testRenderMyTasksFlagsAnOverdueTaskWithTheWarningEmoji(): void
+    {
+        // Regression: renderMyTasks() used to call rowLabel() without
+        // $today, so the ⚠️ flag never appeared here even though the
+        // pinned list's own render() showed it correctly.
+        $tasks = [
+            $this->task(id: 1, title: 'Overdue task', priority: 1000, channelId: 'C1', dueDate: $this->now->modify('-2 days')->format('Y-m-d')),
+            $this->task(id: 2, title: 'Not due yet', priority: 2000, channelId: 'C1', dueDate: $this->now->modify('+2 days')->format('Y-m-d')),
+        ];
+
+        $blocks = $this->renderer->renderMyTasks($tasks, $this->now);
+        $listText = $blocks[1]['text']['text'];
+
+        $this->assertStringContainsString('⚠️', $listText);
+        $this->assertStringNotContainsString('Not due yet (⚠️', $listText);
     }
 
     /**

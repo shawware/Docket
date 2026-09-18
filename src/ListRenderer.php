@@ -53,7 +53,7 @@ final class ListRenderer
 
         $blocks = [];
 
-        foreach ($this->buildCallout('⚠️ Overdue', $this->overdueTasks($openTasks, $today)) as $block) {
+        foreach ($this->buildCallout('⚠️ Overdue', $this->overdueTasks($openTasks, $now)) as $block) {
             $blocks[] = $block;
         }
         foreach ($this->buildCallout('⏰ Due soon', $this->dueSoonTasks($openTasks, $today, $dueSoonWindowDays)) as $block) {
@@ -124,7 +124,7 @@ final class ListRenderer
      * }> $tasks open tasks, as returned by StorageInterface::tasksForAssignee().
      * @return array<int, array<string, mixed>> Block Kit blocks.
      */
-    public function renderMyTasks(array $tasks): array
+    public function renderMyTasks(array $tasks, \DateTimeImmutable $now): array
     {
         if ($tasks === []) {
             return [[
@@ -132,6 +132,8 @@ final class ListRenderer
                 'text' => ['type' => 'mrkdwn', 'text' => '_No open tasks._'],
             ]];
         }
+
+        $today = new \DateTimeImmutable($now->format('Y-m-d'));
 
         $byChannel = [];
         foreach ($tasks as $task) {
@@ -146,7 +148,7 @@ final class ListRenderer
             ];
 
             $lines = array_map(
-                fn (array $task): string => '• ' . $this->rowLabel($task),
+                fn (array $task): string => '• ' . $this->rowLabel($task, $today),
                 $channelTasks
             );
             $blocks[] = [
@@ -159,11 +161,18 @@ final class ListRenderer
     }
 
     /**
-     * @param array<int, array<string, mixed>> $tasks
+     * Open tasks past their due date, most-recently-overdue first — the
+     * same rule the pinned list's own "⚠️ Overdue" callout uses. Public
+     * so the weekly digest's channel-level overdue report can reuse this
+     * exact definition instead of re-implementing the due-date check.
+     *
+     * @param array<int, array<string, mixed>> $tasks open tasks
      * @return array<int, array<string, mixed>>
      */
-    private function overdueTasks(array $tasks, \DateTimeImmutable $today): array
+    public function overdueTasks(array $tasks, \DateTimeImmutable $now): array
     {
+        $today = new \DateTimeImmutable($now->format('Y-m-d'));
+
         $overdue = array_values(array_filter(
             $tasks,
             static fn (array $task): bool => $task['dueDate'] !== null && $task['dueDate'] < $today

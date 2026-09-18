@@ -122,7 +122,7 @@ final class DigestServiceTest extends TestCase
 
         $summaryPosts = array_filter(
             $slackApi->postedMessages,
-            static fn (array $m): bool => $m['fallbackText'] === 'Unassigned tasks in this channel'
+            static fn (array $m): bool => $m['fallbackText'] === 'Channel task summary'
         );
 
         $this->assertCount(1, $summaryPosts, 'only one channel has an unassigned open task');
@@ -142,7 +142,7 @@ final class DigestServiceTest extends TestCase
 
         $summaryPosts = array_filter(
             $slackApi->postedMessages,
-            static fn (array $m): bool => $m['fallbackText'] === 'Unassigned tasks in this channel'
+            static fn (array $m): bool => $m['fallbackText'] === 'Channel task summary'
         );
         $summary = reset($summaryPosts);
 
@@ -160,11 +160,68 @@ final class DigestServiceTest extends TestCase
 
         $summaryPosts = array_filter(
             $slackApi->postedMessages,
-            static fn (array $m): bool => $m['fallbackText'] === 'Unassigned tasks in this channel'
+            static fn (array $m): bool => $m['fallbackText'] === 'Channel task summary'
         );
         $text = json_encode(reset($summaryPosts)['blocks']);
 
         $this->assertStringContainsString('There are 1 open task in this channel.', $text);
+    }
+
+    public function testChannelSummaryReportsOverdueTasksEvenWhenEveryoneIsAssigned(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+        $overdueDate = new \DateTimeImmutable('-2 days');
+
+        // Fully assigned — no unassigned tasks — but one is overdue. Before
+        // this change, a fully-assigned channel got no summary post at all.
+        $storage->createTask('C1', 'Overdue but assigned', 'U_ME', 1000, false, $overdueDate, 'U1');
+
+        $digest->run();
+
+        $summaryPosts = array_filter(
+            $slackApi->postedMessages,
+            static fn (array $m): bool => $m['fallbackText'] === 'Channel task summary'
+        );
+
+        $this->assertCount(1, $summaryPosts, 'an overdue task must trigger a channel post even with nothing unassigned');
+        $text = json_encode(reset($summaryPosts)['blocks'], JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('⚠️ Overdue (1)', $text);
+        $this->assertStringContainsString('Overdue but assigned', $text);
+        $this->assertStringNotContainsString('Unassigned tasks', $text, 'nothing is unassigned, so that section must not appear');
+    }
+
+    public function testChannelSummaryOmitsTheOverdueSectionWhenNothingIsOverdue(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Needs an owner', null, 1000, false, null, 'U1');
+
+        $digest->run();
+
+        $summaryPosts = array_filter(
+            $slackApi->postedMessages,
+            static fn (array $m): bool => $m['fallbackText'] === 'Channel task summary'
+        );
+        $text = json_encode(reset($summaryPosts)['blocks']);
+
+        $this->assertStringNotContainsString('Overdue', $text);
+    }
+
+    public function testChannelSummaryIsSilentWhenNothingIsUnassignedOrOverdue(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+        $futureDate = new \DateTimeImmutable('+30 days');
+
+        $storage->createTask('C1', 'Assigned and not due yet', 'U_ME', 1000, false, $futureDate, 'U1');
+
+        $digest->run();
+
+        $summaryPosts = array_filter(
+            $slackApi->postedMessages,
+            static fn (array $m): bool => $m['fallbackText'] === 'Channel task summary'
+        );
+
+        $this->assertSame([], $summaryPosts);
     }
 
     public function testSweepsDoneTasksAndRepublishesEveryChannelWithTasks(): void

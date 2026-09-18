@@ -206,7 +206,7 @@ final class Router
 
         $userId = (string) ($event['user'] ?? '');
         $tasks = $this->storage->tasksForAssignee($userId);
-        $blocks = $this->listRenderer->renderMyTasks($tasks);
+        $blocks = $this->listRenderer->renderMyTasks($tasks, new \DateTimeImmutable());
 
         $this->slackApi->publishView($userId, [
             'type' => 'home',

@@ -21,7 +21,7 @@ use Shawware\Docket\Storage\StorageInterface;
  */
 final class DigestService
 {
-    private const UNASSIGNED_FALLBACK_TEXT = 'Unassigned tasks in this channel';
+    private const CHANNEL_SUMMARY_FALLBACK_TEXT = 'Channel task summary';
 
     private const DIGEST_FALLBACK_TEXT = 'Your weekly Docket digest';
 
@@ -40,7 +40,7 @@ final class DigestService
     {
         return [
             ...$this->sendAssigneeDigests($dryRun),
-            ...$this->sendUnassignedSummaries($dryRun),
+            ...$this->sendChannelSummaries($dryRun),
             ...$this->sweepAndRepublish($dryRun),
         ];
     }
@@ -76,7 +76,7 @@ final class DigestService
 
             $blocks = [
                 ...$this->assigneeDigestHeaderBlocks($completedCount, count($tasks)),
-                ...$this->listRenderer->renderMyTasks($tasks),
+                ...$this->listRenderer->renderMyTasks($tasks, new \DateTimeImmutable()),
             ];
             $dmChannel = $this->slackApi->openDm($userId);
             $this->slackApi->postMessage($dmChannel, $blocks, self::DIGEST_FALLBACK_TEXT);
@@ -136,37 +136,58 @@ final class DigestService
     }
 
     /**
+     * Posts a channel-level heads-up when there's something worth a nudge:
+     * an open task with no owner, or an open task that's overdue
+     * (regardless of who it's assigned to — everyone in the channel
+     * benefits from knowing). Silent otherwise, same as before.
+     *
      * @return array<int, string>
      */
-    private function sendUnassignedSummaries(bool $dryRun): array
+    private function sendChannelSummaries(bool $dryRun): array
     {
         $report = [];
 
         foreach ($this->storage->channelsWithOpenTasks() as $channelId) {
+            $openTasks = $this->storage->tasksForChannel($channelId, includeDone: false);
             $unassigned = $this->storage->unassignedTasksForChannel($channelId);
+            $overdue = $this->listRenderer->overdueTasks($openTasks, new \DateTimeImmutable());
 
-            if ($unassigned === []) {
+            if ($unassigned === [] && $overdue === []) {
                 continue;
             }
 
-            $openCount = count($this->storage->tasksForChannel($channelId, includeDone: false));
-
             $report[] = sprintf(
-                'Post to %s: %d open task(s) total, %d unassigned',
+                'Post to %s: %d open task(s) total, %d unassigned, %d overdue',
                 $channelId,
-                $openCount,
-                count($unassigned)
+                count($openTasks),
+                count($unassigned),
+                count($overdue)
             );
 
             if ($dryRun) {
                 continue;
             }
 
-            $lines = array_map(static fn (array $task): string => '• ' . $task['title'], $unassigned);
-            $text = sprintf('There are %d open task%s in this channel.', $openCount, $openCount === 1 ? '' : 's')
-                . "\n\n*Unassigned tasks:*\n" . implode("\n", $lines);
+            $text = sprintf(
+                'There are %d open task%s in this channel.',
+                count($openTasks),
+                count($openTasks) === 1 ? '' : 's'
+            );
 
-            $this->slackApi->postMessage($channelId, [$this->textBlock($text)], self::UNASSIGNED_FALLBACK_TEXT);
+            if ($overdue !== []) {
+                $lines = array_map(
+                    static fn (array $task): string => '• ' . $task['title'] . ' — ' . $task['dueDate']->format('Y-m-d'),
+                    $overdue
+                );
+                $text .= "\n\n*⚠️ Overdue (" . count($overdue) . "):*\n" . implode("\n", $lines);
+            }
+
+            if ($unassigned !== []) {
+                $lines = array_map(static fn (array $task): string => '• ' . $task['title'], $unassigned);
+                $text .= "\n\n*Unassigned tasks:*\n" . implode("\n", $lines);
+            }
+
+            $this->slackApi->postMessage($channelId, [$this->textBlock($text)], self::CHANNEL_SUMMARY_FALLBACK_TEXT);
         }
 
         return $report;
