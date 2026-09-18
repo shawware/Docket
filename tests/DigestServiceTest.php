@@ -98,6 +98,49 @@ final class DigestServiceTest extends TestCase
         $this->assertNotNull($storage->getListState('C1'), 'a channel with only a just-completed task must still be republished');
     }
 
+    public function testDryRunMakesNoSlackCallsAndMutatesNoStorage(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Needs an owner', null, 1000, false, null, 'U1');
+        $done = $storage->createTask('C1', 'Assigned, now done', 'U_ME', 2000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $digest->run(dryRun: true);
+
+        $this->assertSame([], $slackApi->calls, 'dry run must make no Slack calls at all');
+        $this->assertNotNull($storage->getTask($done['id']), 'dry run must not sweep the done task');
+        $this->assertNull($storage->getListState('C1'), 'dry run must not publish/save list state');
+    }
+
+    public function testDryRunReportDescribesEveryActionThatWouldHappen(): void
+    {
+        [$digest, $storage] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Needs an owner', null, 1000, false, null, 'U1');
+        $storage->createTask('C1', 'Mine', 'U_ME', 2000, false, null, 'U1');
+        $done = $storage->createTask('C1', 'Old done task', null, 3000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $report = $digest->run(dryRun: true);
+        $text = implode("\n", $report);
+
+        $this->assertStringContainsString('DM U_ME', $text);
+        $this->assertStringContainsString('unassigned summary (1 task', $text);
+        $this->assertStringContainsString('Sweep C1: 1 done task(s)', $text);
+    }
+
+    public function testRealRunAlsoReturnsAReportOfWhatItDid(): void
+    {
+        [$digest, $storage] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Mine', 'U_ME', 1000, false, null, 'U1');
+
+        $report = $digest->run();
+
+        $this->assertStringContainsString('DM U_ME', implode("\n", $report));
+    }
+
     /**
      * @return array<int, string>
      */

@@ -44,7 +44,18 @@ $channelListService = new ChannelListService(
     $config['sourceLinkMaxAgeDays']
 );
 
-$digestService = new DigestService($storage, $slackApi, $channelListService, $listRenderer);
-$digestService->run();
+$dryRun = array_key_exists('dry-run', getopt('', ['dry-run']));
 
-echo "Weekly digest sent.\n";
+$digestService = new DigestService($storage, $slackApi, $channelListService, $listRenderer);
+$report = $digestService->run($dryRun);
+
+// The real (cron) run prints nothing on success — cron mails whatever a
+// job writes to stdout to the account owner, and a weekly action log is
+// noise nobody reads. --dry-run is the one case there's someone at a
+// terminal actually wanting to see this.
+if ($dryRun) {
+    foreach ($report as $line) {
+        echo '[DRY RUN] ' . $line . "\n";
+    }
+    echo "Dry run complete — no messages were sent and no data was changed.\n";
+}
