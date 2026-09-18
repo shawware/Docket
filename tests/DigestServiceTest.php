@@ -33,6 +33,72 @@ final class DigestServiceTest extends TestCase
         $this->assertStringNotContainsString('Not mine', $myDigest);
     }
 
+    public function testAssigneeDigestLeadsWithHowManyOpenTasksTheyHave(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Task A', 'U_ME', 1000, false, null, 'U1');
+        $storage->createTask('C1', 'Task B', 'U_ME', 2000, false, null, 'U1');
+
+        $digest->run();
+
+        $this->assertStringContainsString('You have 2 open tasks.', $this->postedMessageTextFor($slackApi, 'D123'));
+    }
+
+    public function testAssigneeDigestUsesSingularWordingForOneOpenTask(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Only task', 'U_ME', 1000, false, null, 'U1');
+
+        $digest->run();
+
+        $this->assertStringContainsString('You have 1 open task.', $this->postedMessageTextFor($slackApi, 'D123'));
+        $this->assertStringNotContainsString('1 open tasks.', $this->postedMessageTextFor($slackApi, 'D123'));
+    }
+
+    public function testAssigneeDigestLeadsWithACompletedCountWhenSomethingWasCompletedSinceLastCheck(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Still open', 'U_ME', 1000, false, null, 'U1');
+        $done = $storage->createTask('C1', 'Just finished', 'U_ME', 2000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $digest->run();
+
+        $text = $this->postedMessageTextFor($slackApi, 'D123');
+        // The completed line must come before the open-count line ("It can go first").
+        $this->assertMatchesRegularExpression(
+            '/You completed 1 task since the last check.*You have 1 open task\./s',
+            $text
+        );
+    }
+
+    public function testAssigneeDigestOmitsTheCompletedLineWhenNothingWasCompleted(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Still open', 'U_ME', 1000, false, null, 'U1');
+
+        $digest->run();
+
+        $this->assertStringNotContainsString('completed', $this->postedMessageTextFor($slackApi, 'D123'));
+    }
+
+    public function testAssigneeDigestDoesNotCountAnUnassignedDoneTaskAsAnyonesCompletion(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Still open', 'U_ME', 1000, false, null, 'U1');
+        $done = $storage->createTask('C1', 'Done, never assigned', null, 2000, false, null, 'U1');
+        $storage->markDone($done['id']);
+
+        $digest->run();
+
+        $this->assertStringNotContainsString('completed', $this->postedMessageTextFor($slackApi, 'D123'));
+    }
+
     public function testAssigneeWithNoOpenTasksGetsNoDigestDm(): void
     {
         [$digest, $storage, $slackApi] = $this->makeDigestService();
@@ -63,6 +129,42 @@ final class DigestServiceTest extends TestCase
         $summary = reset($summaryPosts);
         $this->assertSame('C1', $summary['channel']);
         $this->assertStringContainsString('Needs an owner', json_encode($summary['blocks']));
+    }
+
+    public function testChannelSummaryLeadsWithTheTotalOpenTaskCountNotJustUnassigned(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Needs an owner', null, 1000, false, null, 'U1');
+        $storage->createTask('C1', 'Already assigned', 'U_ME', 2000, false, null, 'U1');
+
+        $digest->run();
+
+        $summaryPosts = array_filter(
+            $slackApi->postedMessages,
+            static fn (array $m): bool => $m['fallbackText'] === 'Unassigned tasks in this channel'
+        );
+        $summary = reset($summaryPosts);
+
+        // 2 open tasks total in C1, only 1 of them unassigned.
+        $this->assertStringContainsString('There are 2 open tasks in this channel.', json_encode($summary['blocks']));
+    }
+
+    public function testChannelSummaryUsesSingularWordingForOneOpenTask(): void
+    {
+        [$digest, $storage, $slackApi] = $this->makeDigestService();
+
+        $storage->createTask('C1', 'Needs an owner', null, 1000, false, null, 'U1');
+
+        $digest->run();
+
+        $summaryPosts = array_filter(
+            $slackApi->postedMessages,
+            static fn (array $m): bool => $m['fallbackText'] === 'Unassigned tasks in this channel'
+        );
+        $text = json_encode(reset($summaryPosts)['blocks']);
+
+        $this->assertStringContainsString('There are 1 open task in this channel.', $text);
     }
 
     public function testSweepsDoneTasksAndRepublishesEveryChannelWithTasks(): void
@@ -126,7 +228,7 @@ final class DigestServiceTest extends TestCase
         $text = implode("\n", $report);
 
         $this->assertStringContainsString('DM U_ME', $text);
-        $this->assertStringContainsString('unassigned summary (1 task', $text);
+        $this->assertStringContainsString('2 open task(s) total, 1 unassigned', $text);
         $this->assertStringContainsString('Sweep C1: 1 done task(s)', $text);
     }
 

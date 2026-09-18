@@ -51,32 +51,88 @@ final class DigestService
     private function sendAssigneeDigests(bool $dryRun): array
     {
         $report = [];
+        $completedCounts = $this->completedCountsByAssignee();
 
         foreach ($this->storage->assigneesWithOpenTasks() as $userId) {
             $tasks = $this->storage->tasksForAssignee($userId);
+            $completedCount = $completedCounts[$userId] ?? 0;
             $channels = array_values(array_unique(array_map(
                 static fn (array $task): string => $task['channelId'],
                 $tasks
             )));
 
             $report[] = sprintf(
-                'DM %s: %d open task(s) across %d channel(s) (%s)',
+                'DM %s: %d open task(s) across %d channel(s) (%s)%s',
                 $userId,
                 count($tasks),
                 count($channels),
-                implode(', ', $channels)
+                implode(', ', $channels),
+                $completedCount > 0 ? "; {$completedCount} completed since last check" : ''
             );
 
             if ($dryRun) {
                 continue;
             }
 
-            $blocks = $this->listRenderer->renderMyTasks($tasks);
+            $blocks = [
+                ...$this->assigneeDigestHeaderBlocks($completedCount, count($tasks)),
+                ...$this->listRenderer->renderMyTasks($tasks),
+            ];
             $dmChannel = $this->slackApi->openDm($userId);
             $this->slackApi->postMessage($dmChannel, $blocks, self::DIGEST_FALLBACK_TEXT);
         }
 
         return $report;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function assigneeDigestHeaderBlocks(int $completedCount, int $openCount): array
+    {
+        $blocks = [];
+
+        if ($completedCount > 0) {
+            $blocks[] = $this->textBlock(sprintf(
+                '✅ You completed %d task%s since the last check.',
+                $completedCount,
+                $completedCount === 1 ? '' : 's'
+            ));
+        }
+
+        $blocks[] = $this->textBlock(sprintf(
+            'You have %d open task%s.',
+            $openCount,
+            $openCount === 1 ? '' : 's'
+        ));
+
+        return $blocks;
+    }
+
+    /**
+     * User id => number of currently-done tasks assigned to them, across
+     * every channel. sweepAndRepublish() deletes every done row on every
+     * run, so whatever's still done right now — before that pass runs —
+     * is exactly what's been completed since the last run, no timestamp
+     * comparison needed.
+     *
+     * @return array<string, int>
+     */
+    private function completedCountsByAssignee(): array
+    {
+        $counts = [];
+
+        foreach ($this->storage->channelsWithTasks() as $channelId) {
+            foreach ($this->storage->tasksForChannel($channelId) as $task) {
+                if ($task['status'] !== 'done' || $task['assigneeUserId'] === null) {
+                    continue;
+                }
+
+                $counts[$task['assigneeUserId']] = ($counts[$task['assigneeUserId']] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
     }
 
     /**
@@ -93,9 +149,12 @@ final class DigestService
                 continue;
             }
 
+            $openCount = count($this->storage->tasksForChannel($channelId, includeDone: false));
+
             $report[] = sprintf(
-                'Post to %s: unassigned summary (%d task(s))',
+                'Post to %s: %d open task(s) total, %d unassigned',
                 $channelId,
+                $openCount,
                 count($unassigned)
             );
 
@@ -104,12 +163,10 @@ final class DigestService
             }
 
             $lines = array_map(static fn (array $task): string => '• ' . $task['title'], $unassigned);
-            $blocks = [[
-                'type' => 'section',
-                'text' => ['type' => 'mrkdwn', 'text' => "*Unassigned tasks:*\n" . implode("\n", $lines)],
-            ]];
+            $text = sprintf('There are %d open task%s in this channel.', $openCount, $openCount === 1 ? '' : 's')
+                . "\n\n*Unassigned tasks:*\n" . implode("\n", $lines);
 
-            $this->slackApi->postMessage($channelId, $blocks, self::UNASSIGNED_FALLBACK_TEXT);
+            $this->slackApi->postMessage($channelId, [$this->textBlock($text)], self::UNASSIGNED_FALLBACK_TEXT);
         }
 
         return $report;
@@ -139,5 +196,13 @@ final class DigestService
         }
 
         return $report;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function textBlock(string $text): array
+    {
+        return ['type' => 'section', 'text' => ['type' => 'mrkdwn', 'text' => $text]];
     }
 }
