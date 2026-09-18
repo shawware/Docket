@@ -200,7 +200,7 @@ final class DigestService
 
             if ($unassigned !== []) {
                 $lines = array_map(static fn (array $task): string => '• ' . $task['title'], $unassigned);
-                $text .= "\n\n*Unassigned tasks:*\n" . implode("\n", $lines);
+                $text .= "\n\n*Unassigned (" . count($unassigned) . "):*\n" . implode("\n", $lines);
             }
 
             $this->slackApi->postMessage($channelId, [$this->textBlock($text)], self::CHANNEL_SUMMARY_FALLBACK_TEXT);

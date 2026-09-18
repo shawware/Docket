@@ -128,7 +128,9 @@ final class DigestServiceTest extends TestCase
         $this->assertCount(1, $summaryPosts, 'only one channel has an unassigned open task');
         $summary = reset($summaryPosts);
         $this->assertSame('C1', $summary['channel']);
-        $this->assertStringContainsString('Needs an owner', json_encode($summary['blocks']));
+        $text = json_encode($summary['blocks']);
+        $this->assertStringContainsString('Needs an owner', $text);
+        $this->assertStringContainsString('Unassigned (1):', $text, 'heading must show the count, not the word "tasks"');
     }
 
     public function testChannelSummaryLeadsWithTheTotalOpenTaskCountNotJustUnassigned(): void
@@ -187,7 +189,7 @@ final class DigestServiceTest extends TestCase
         $text = json_encode(reset($summaryPosts)['blocks'], JSON_UNESCAPED_UNICODE);
         $this->assertStringContainsString('⚠️ Overdue (1)', $text);
         $this->assertStringContainsString('Overdue but assigned', $text);
-        $this->assertStringNotContainsString('Unassigned tasks', $text, 'nothing is unassigned, so that section must not appear');
+        $this->assertStringNotContainsString('Unassigned', $text, 'nothing is unassigned, so that section must not appear');
     }
 
     public function testChannelSummaryOmitsTheOverdueSectionWhenNothingIsOverdue(): void
