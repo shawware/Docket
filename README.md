@@ -1,12 +1,15 @@
 # Docket
 
-A Slack app for a simple, shared team backlog: a prioritized, pinned task
-list per channel, with real assignees.
+Docket is a Slack app for a shared team backlog. Each channel gets a prioritized, pinned task list, with real assignees.
 
-Intentionally designed to be as light-weight as possible. If you want
-someting more, look at other apps with more features and/or paid tiers.
+Docket is intentionally light-weight. It only uses features available in a free Slack workspace. If you need more features, look at another app instead.
 
 See [CLAUDE.md](CLAUDE.md) for the full specification.
+
+## Installation
+
+- [Install on shared hosting with MySQL](docs/install-shared-hosting-mysql.md)
+- [Set up the Slack app](docs/slack-app-setup.md)
 
 ## License
 
